@@ -1,0 +1,12 @@
+# Built-in (firmware-linked) app: it needs the ST GAP/GATT/HCI command API,
+# which the firmware does not export to .fap apps. See ../build.sh.
+App(
+    appid="bt_inspector",
+    name="BT Inspector",
+    apptype=FlipperAppType.APP,
+    entry_point="bt_inspector_app",
+    requires=["gui", "storage"],
+    stack_size=4 * 1024,
+    icon="A_Plugins_14",
+    order=25,
+)

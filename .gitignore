@@ -1,0 +1,6 @@
+flipperzero-firmware/
+.venv/
+build.log
+*.log
+__pycache__/
+dist/
