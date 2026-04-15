@@ -9,7 +9,8 @@ services and characteristics: read, write, subscribe, and log it all.
 > Flipper's radio coprocessor ships with ST's "BLE Light" stack, which can only
 > advertise (peripheral role). It cannot scan for or connect to other devices.
 > BT Inspector is therefore delivered as a **custom firmware build** that swaps
-> in ST's full BLE stack and compiles the app in. `build.sh` does all of this.
+> in ST's full BLE stack and exports the BLE command API to apps. The app itself
+> is a normal `.fap`. `build.sh` does all of this.
 > See [Why a custom firmware build](#why-a-custom-firmware-build).
 
 ## Features
@@ -62,19 +63,34 @@ Requirements: Linux or macOS with `git`, `python3` and a few GB of disk. The
 firmware build system downloads its own ARM toolchain.
 
 ```sh
-./build.sh          # clone firmware 1.4.3, add the app, build with the full BLE stack
+./build.sh          # clone firmware 1.4.3, export the BLE API, build firmware + .fap
 ./build.sh flash    # same, then flash over USB (Flipper connected, qFlipper closed)
+./build.sh fap      # rebuild only the .fap after editing the app
 ```
 
 Options via environment variables: `FW_TAG` (firmware tag, default `1.4.3`),
-`FW_DIR` (where to clone), `JOBS` (parallel compile jobs, default 4).
+`FW_DIR` (where to clone), `JOBS` (parallel compile jobs, default 4),
+`BLE_API` (which ST API to export, see below).
 
 The result is a standard update package in
-`flipperzero-firmware/dist/f7-C/f7-update-local/`. To install without USB
-flashing, copy that folder to the SD card (for example `SD:/update/`) and open
-it in the Flipper's file browser: the updater installs the firmware **and the
-full radio stack**. Installing an official firmware later restores the light
-stack the same way.
+`flipperzero-firmware/dist/f7-C/f7-update-local/`. It contains the firmware,
+the **full radio stack**, and the app as `apps/Bluetooth/bt_inspector.fap` in
+its resources. To install without USB flashing, copy that folder to the SD card
+(for example `SD:/update/`) and open it in the Flipper's file browser.
+Installing an official firmware later restores the light stack the same way.
+
+The `.fap` alone is at `flipperzero-firmware/build/f7-firmware-C/.extapps/`;
+after the firmware is installed once, app updates are just a file copy to
+`SD:/apps/Bluetooth/`. It only loads on this firmware (API version 87.2 with
+the exported symbols); the stock loader rejects it with an API mismatch.
+
+To build the app with `ufbt` instead of the firmware tree, point `ufbt` at the
+SDK the build produces:
+
+```sh
+ufbt update --local=flipperzero-firmware/dist/f7-C/flipper-z-f7-sdk-local.zip
+cd bt_inspector && ufbt        # -> dist/bt_inspector.fap ; `ufbt launch` installs it
+```
 
 The first build takes 5-15 minutes; later builds are incremental.
 
@@ -128,12 +144,26 @@ Three facts about the Flipper Zero drive the design:
    firmware build system already supports it (`COPRO_STACK_TYPE=ble_full`) and
    the firmware recognises it at runtime (`FuriHalBtStackFull`).
 2. External `.fap` apps can only call functions listed in the firmware's API
-   table. The ST `aci_*` / `hci_*` command functions are not in it, so a `.fap`
-   cannot start a scan or a connection. Compiling the app into the firmware
-   (`FlipperAppType.APP`, added with `--extra-int-apps`) gives it access.
-3. The full stack is 34 KB larger and loads at 0x080CE000 instead of
-   0x080D7000. The built image still leaves 12 flash pages (52 KB) for the
-   Flipper's internal storage (stock leaves 27).
+   table. The ST `aci_*` / `hci_*` command functions are not in it, so a stock
+   `.fap` cannot start a scan or a connection. `build.sh` adds ST's command
+   headers to the SDK (`lib/stm32wb.scons`), adds `extern "C"` guards to them
+   (the API table is C++), lets `fbt` regenerate `api_symbols.csv`, and enables
+   the selected functions. The API minor version becomes 87.2.
+3. Every exported function is kept in the firmware image, so `BLE_API` trades
+   generality for flash. The full stack loads at 0x080CE000 (light: 0x080D7000);
+   the space between the firmware and the stack is the Flipper's internal
+   storage:
+
+   | `BLE_API` | exported | firmware | pages left, full stack | pages left, extended stack |
+   |---|---|---|---|---|
+   | `min` (app's own 15 imports) | 15 | 770 KB | 18 | 9 |
+   | `hci,gatt` (default) | 127 | 779 KB | 15 | 6 |
+   | `all` | 211 | ~788 KB | 13 | 4 |
+   | stock light-stack firmware | 0 | 768 KB | 27 | n/a |
+
+   Any comma list of `hci,gap,gatt,hal,l2cap` works. `extended` refers to
+   `stm32wb5x_BLE_Stack_full_extended_fw.bin` (BLE 5 extended advertising,
+   Coded PHY), which loads at 0x080C5000; it is not selected by this script.
 
 `build.sh` also widens the GAP roles the firmware initialises
 (`GAP_PERIPHERAL_ROLE | GAP_CENTRAL_ROLE | GAP_OBSERVER_ROLE`) in
@@ -182,8 +212,12 @@ wire overlay).
   Install the package produced by `build.sh`, which includes `radio.bin` with
   the full stack.
 * **Build killed / out of memory**: `JOBS=2 ./build.sh`.
-* **Updater link errors about `bt`/`rpc`**: the app manifest must not `require`
-  the `bt` service (the same app list is linked into the tiny updater image).
+* **App refuses to load ("API mismatch" / unresolved symbol)**: the firmware on
+  the device is not the one from `build.sh`, or it was built with a smaller
+  `BLE_API` than the app needs. Reinstall the update package.
+* **"API version is still WIP"** during a build: `fbt` found symbols the script
+  did not classify. Open `targets/f7/api_symbols.csv`, replace the remaining
+  `?` marks with `+` or `-`, rerun.
 * **Connect failed: Timeout**: the device may not be connectable (see the
   advertising type on the device page), or it is out of range. Random-address
   devices that rotate their address may need re-selecting from the list.
@@ -191,7 +225,7 @@ wire overlay).
 ## Layout
 
 ```
-bt_inspector/      app sources + application.fam
+bt_inspector/      app sources, application.fam, icon.png
 build.sh           firmware build / flash script
 flipperzero-firmware/   created by build.sh (git-ignored)
 ```

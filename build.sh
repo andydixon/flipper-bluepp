@@ -6,11 +6,16 @@
 #     broadcaster only. Scanning and connecting as a central need the "full"
 #     stack (COPRO_STACK_TYPE=ble_full, already supported by fbt).
 #   * The firmware does not export the ST GAP/GATT/HCI command API to external
-#     apps, so the app is compiled in as a built-in ("--extra-int-apps").
+#     apps. This script adds those headers to the SDK and accepts the new
+#     aci_*/hci_* symbols, so the app builds as a normal .fap (bumps the API
+#     minor version: the .fap only loads on this firmware).
 #
 # Usage:
-#   ./build.sh            build  -> flipperzero-firmware/dist/f7-C/f7-update-*/ (update package)
+#   ./build.sh            build  -> flipperzero-firmware/dist/f7-C/f7-update-*/ (update package,
+#                         includes the .fap under apps/Bluetooth) + SDK zip for ufbt
 #   ./build.sh flash      build and flash over USB (Flipper connected, qFlipper closed)
+#   ./build.sh fap        rebuild only the .fap (firmware already built once)
+#   BLE_API=all|min|hci,gap,gatt,hal,l2cap   which ST API to export (default hci,gatt)
 #   FW_TAG=1.4.3 ./build.sh   pin a different firmware tag (default 1.4.3)
 #   JOBS=2 ./build.sh         limit parallel compile jobs (default 4)
 set -euo pipefail
@@ -36,6 +41,48 @@ if grep -q "^        GAP_PERIPHERAL_ROLE,$" "$GAP_C"; then
     echo ">> patched $GAP_C: GAP roles = peripheral|central|observer"
 fi
 
+# Export the ST BLE command API (aci_*/hci_*) to external apps.
+WB_SCONS=lib/stm32wb.scons
+python3 - "$WB_SCONS" <<'PY'
+import re, sys
+p = sys.argv[1]
+s = open(p).read()
+block = """# BT Inspector: expose the ST BLE command API to .fap apps
+env.Append(
+    SDK_HEADERS=[
+        File("stm32wb_copro/wpan/ble/core/auto/ble_hci_le.h"),
+        File("stm32wb_copro/wpan/ble/core/auto/ble_gap_aci.h"),
+        File("stm32wb_copro/wpan/ble/core/auto/ble_gatt_aci.h"),
+        File("stm32wb_copro/wpan/ble/core/auto/ble_hal_aci.h"),
+        File("stm32wb_copro/wpan/ble/core/auto/ble_l2cap_aci.h"),
+        File("stm32wb_copro/wpan/ble/core/auto/ble_vs_codes.h"),
+    ],
+)
+
+"""
+s = re.sub(r"\n*# BT Inspector: expose.*?\n\)\n", "\n", s, flags=re.S)  # drop any earlier copy
+if block not in s:
+    s = s.replace('Return("lib")', block + 'Return("lib")', 1)  # must run before Return
+    open(p, "w").write(s)
+    print(">> patched " + p + ": ST BLE headers added to SDK")
+PY
+
+# ST's generated headers have no extern "C" guards; the API table is C++.
+python3 - <<'PY'
+import re
+for name in ["ble_hci_le", "ble_gap_aci", "ble_gatt_aci", "ble_hal_aci", "ble_l2cap_aci"]:
+    p = f"lib/stm32wb_copro/wpan/ble/core/auto/{name}.h"
+    s = open(p).read()
+    if "__cplusplus" in s:
+        continue
+    guard = re.search(r"#define \w+_H__\n", s).group(0)
+    s = s.replace(guard, guard + '#ifdef __cplusplus\nextern "C" {\n#endif\n', 1)
+    i = s.rstrip().rfind("#endif")
+    s = s[:i] + "#ifdef __cplusplus\n}\n#endif\n" + s[i:]
+    open(p, "w").write(s)
+    print(">> patched " + p + ': extern "C" guards')
+PY
+
 # Link (or refresh) the app into the user apps directory.
 mkdir -p applications_user
 rm -rf applications_user/bt_inspector
@@ -45,10 +92,58 @@ FBT_ARGS=(
     COMPACT=1 DEBUG=0 # release build, same as official images
     COPRO_STACK_TYPE=ble_full
     COPRO_STACK_BIN=stm32wb5x_BLE_Stack_full_fw.bin
-    --extra-int-apps=bt_inspector
 )
 
-echo ">> building update package (full BLE stack + BT Inspector)"
+API_CSV=targets/f7/api_symbols.csv
+# BLE_API selects which ST command headers are exported to apps (each exported
+# function is kept in the firmware image):
+#   hci,gatt  scanning, connections, GATT client/server  (~12 KB, default)
+#   all       also gap, hal, l2cap                       (~20 KB)
+#   min       only the functions BT Inspector imports    (~1.5 KB)
+BLE_API="${BLE_API:-hci,gatt}"
+if grep -q "^Function,?," "$API_CSV" || ! grep -qE "^Header,\+,.*ble_hci_le\.h" "$API_CSV"; then
+    # fbt notices the new headers, rewrites the csv with '?' entries and stops.
+    echo ">> syncing API symbol table (expected to stop once)"
+    ./fbt -j"${JOBS:-4}" "${FBT_ARGS[@]}" api_check || true
+fi
+python3 - "$API_CSV" "$BLE_API" "$APP_SRC" <<'PY'
+import re, sys, glob
+csv_path, mode, app_src = sys.argv[1:4]
+hdrs = {"hci": "ble_hci_le", "gap": "ble_gap_aci", "gatt": "ble_gatt_aci", "hal": "ble_hal_aci", "l2cap": "ble_l2cap_aci"}
+owner = {}
+for key, name in hdrs.items():
+    src = open(f"lib/stm32wb_copro/wpan/ble/core/auto/{name}.h").read()
+    for fn in re.findall(r"^tBleStatus (\w+)\(", src, re.M):
+        owner[fn] = key
+if mode == "all":
+    selected = set(owner)
+elif mode == "min":
+    selected = set()
+    for f in glob.glob(app_src + "/*.c"):
+        selected |= set(re.findall(r"\b((?:aci_|hci_)\w+)\(", open(f).read()))
+else:
+    want = set(mode.split(","))
+    selected = {fn for fn, key in owner.items() if key in want}
+out, n_on = [], 0
+for line in open(csv_path).read().splitlines():
+    parts = line.split(",")
+    if len(parts) >= 3 and parts[0] == "Function" and parts[2] in owner:
+        parts[1] = "+" if parts[2] in selected else "-"
+        n_on += parts[1] == "+"
+    elif len(parts) >= 2 and parts[1] == "?":
+        parts[1] = "-" if parts[0] == "Variable" else "+"
+    out.append(",".join(parts))
+open(csv_path, "w").write("\n".join(out) + "\n")
+print(f">> BLE API export ({mode}): {n_on} of {len(owner)} aci_*/hci_* functions enabled")
+PY
+
+if [ "${1:-}" = "fap" ]; then
+    ./fbt -j"${JOBS:-4}" "${FBT_ARGS[@]}" fap_bt_inspector
+    echo ">> $(ls build/f7-firmware-C/.extapps/bt_inspector.fap)"
+    exit 0
+fi
+
+echo ">> building update package (full BLE stack + BT Inspector .fap)"
 ./fbt -j"${JOBS:-4}" "${FBT_ARGS[@]}" updater_package
 
 PKG=$(ls -d dist/f7-C/f7-update-* 2>/dev/null | head -1)
@@ -58,6 +153,9 @@ echo ">> radio stack in package:"
 grep -E "^Radio" "$PKG/update.fuf" || true
 echo ">> firmware size:"
 ls -l "$PKG/firmware.dfu"
+echo ">> app (also inside the package's resources, installed to apps/Bluetooth/):"
+ls -l build/f7-firmware-C/.extapps/bt_inspector.fap
+echo ">> SDK for building the app with ufbt: $(ls dist/f7-C/flipper-z-f7-sdk-*.zip)"
 echo
 echo "Install: copy '$PKG' to the SD card (e.g. /ext/update/) and run it from"
 echo "the file browser, or use: ./build.sh flash"
