@@ -101,13 +101,25 @@ API_CSV=targets/f7/api_symbols.csv
 #   all       also gap, hal, l2cap                       (~20 KB)
 #   min       only the functions BT Inspector imports    (~1.5 KB)
 BLE_API="${BLE_API:-hci,gatt}"
+
+# --- Firmware API exported to .fap apps (in addition to the ST BLE commands) ---
+# Each area is appended below; every enabled symbol stays in the firmware image.
+# BLE peripheral internals: GAP control (advertised name, custom GATT server,
+# extra-beacon config, connection state) and BLE-glue radio-stack status.
+EXPORT_ENABLE="${EXPORT_ENABLE:-}"
+EXPORT_ENABLE+='
+^gap_
+^ble_glue_(start|stop|get_c2_status|get_hardfault_info|force_c2_mode)$
+^furi_hal_bt_init$
+'
+export EXPORT_ENABLE
 if grep -q "^Function,?," "$API_CSV" || ! grep -qE "^Header,\+,.*ble_hci_le\.h" "$API_CSV"; then
     # fbt notices the new headers, rewrites the csv with '?' entries and stops.
     echo ">> syncing API symbol table (expected to stop once)"
     ./fbt -j"${JOBS:-4}" "${FBT_ARGS[@]}" api_check || true
 fi
 python3 - "$API_CSV" "$BLE_API" "$APP_SRC" <<'PY'
-import re, sys, glob
+import os, re, sys, glob
 csv_path, mode, app_src = sys.argv[1:4]
 hdrs = {"hci": "ble_hci_le", "gap": "ble_gap_aci", "gatt": "ble_gatt_aci", "hal": "ble_hal_aci", "l2cap": "ble_l2cap_aci"}
 owner = {}
@@ -124,17 +136,25 @@ elif mode == "min":
 else:
     want = set(mode.split(","))
     selected = {fn for fn, key in owner.items() if key in want}
-out, n_on = [], 0
+# Firmware symbols to force-enable, one regex per line, from $EXPORT_ENABLE.
+enable_res = [re.compile(p) for p in os.environ.get("EXPORT_ENABLE", "").split() if p]
+out, n_on, n_fw = [], 0, 0
 for line in open(csv_path).read().splitlines():
     parts = line.split(",")
     if len(parts) >= 3 and parts[0] == "Function" and parts[2] in owner:
         parts[1] = "+" if parts[2] in selected else "-"
         n_on += parts[1] == "+"
+    elif len(parts) >= 3 and parts[0] in ("Function", "Variable") and any(r.search(parts[2]) for r in enable_res):
+        if parts[1] != "+":
+            n_fw += 1
+        parts[1] = "+"
     elif len(parts) >= 2 and parts[1] == "?":
         parts[1] = "-" if parts[0] == "Variable" else "+"
     out.append(",".join(parts))
 open(csv_path, "w").write("\n".join(out) + "\n")
 print(f">> BLE API export ({mode}): {n_on} of {len(owner)} aci_*/hci_* functions enabled")
+if enable_res:
+    print(f">> firmware API export: {n_fw} extra symbol(s) newly enabled")
 PY
 
 if [ "${1:-}" = "fap" ]; then
