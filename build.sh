@@ -112,6 +112,13 @@ EXPORT_ENABLE+='
 ^ble_glue_(start|stop|get_c2_status|get_hardfault_info|force_c2_mode)$
 ^furi_hal_bt_init$
 '
+# Power / battery internals: the gas-gauge readings (voltage, current,
+# temperature, capacity, health, charge state) are already exported by stock
+# firmware; this adds the remaining safe reader. furi_hal_power_init stays
+# disabled (re-initialising the power HAL from an app is unsafe).
+EXPORT_ENABLE+='
+^furi_hal_power_insomnia_level$
+'
 export EXPORT_ENABLE
 if grep -q "^Function,?," "$API_CSV" || ! grep -qE "^Header,\+,.*ble_hci_le\.h" "$API_CSV"; then
     # fbt notices the new headers, rewrites the csv with '?' entries and stops.
