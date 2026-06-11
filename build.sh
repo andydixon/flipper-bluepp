@@ -119,6 +119,15 @@ EXPORT_ENABLE+='
 EXPORT_ENABLE+='
 ^furi_hal_power_insomnia_level$
 '
+# Flash + option-byte internals: geometry, free-page info, and raw program /
+# erase / write / option-byte access. These let an app read and modify internal
+# flash directly. WARNING: misuse can brick the device or wipe storage; enabled
+# here for research. Set EXPORT_FLASH=0 before building to leave them disabled.
+if [ "${EXPORT_FLASH:-1}" = "1" ]; then
+EXPORT_ENABLE+='
+^furi_hal_flash_
+'
+fi
 export EXPORT_ENABLE
 if grep -q "^Function,?," "$API_CSV" || ! grep -qE "^Header,\+,.*ble_hci_le\.h" "$API_CSV"; then
     # fbt notices the new headers, rewrites the csv with '?' entries and stops.

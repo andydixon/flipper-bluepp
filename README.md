@@ -182,6 +182,11 @@ symbol costs one API-table entry.
   temperature, remaining/full/design capacity, health, charge state) are
   already exported by stock firmware. This build also enables
   `furi_hal_power_insomnia_level`; `furi_hal_power_init` stays disabled.
+* **Flash + option-byte internals** (`furi_hal_flash_*`): flash geometry,
+  free-page info, and raw program / erase / dword-write / option-byte access.
+  An app can read and modify internal flash directly. **This can brick the
+  device or wipe storage.** Enabled here for research; build with
+  `EXPORT_FLASH=0 ./build.sh` to leave these disabled.
 
 `build.sh` also widens the GAP roles the firmware initialises
 (`GAP_PERIPHERAL_ROLE | GAP_CENTRAL_ROLE | GAP_OBSERVER_ROLE`) in
