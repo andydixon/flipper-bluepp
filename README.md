@@ -187,6 +187,15 @@ symbol costs one API-table entry.
   An app can read and modify internal flash directly. **This can brick the
   device or wipe storage.** Enabled here for research; build with
   `EXPORT_FLASH=0 ./build.sh` to leave these disabled.
+* **RPC + loader internals**: the public `rpc_*` and `loader_*` APIs (RPC
+  session open/feed/close, app data exchange, launching and enqueuing apps,
+  lock/unlock, showing the app menu) are already exported by stock firmware and
+  are the supported way to script the Flipper from a host or launch other apps;
+  this build enables them explicitly and adds the internal loader headers
+  (`loader_i.h`, `loader_menu.h`, `loader_queue.h`, `loader_applications.h`) so
+  the internal loader/menu/queue helpers are reachable too. `rpc_i.h` is not
+  exported because it depends on the protobuf headers, which are not in the SDK;
+  the public RPC API covers host scripting.
 
 `build.sh` also widens the GAP roles the firmware initialises
 (`GAP_PERIPHERAL_ROLE | GAP_CENTRAL_ROLE | GAP_OBSERVER_ROLE`) in
