@@ -21,7 +21,8 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_SRC="$HERE/bt_inspector"
+APPS=(bt_inspector ble_hid_host) # app dirs under $HERE, each staged with libble/
+APP_SRC="$HERE/bt_inspector" # used only for the BLE_API=min symbol scan
 FW_DIR="${FW_DIR:-$HERE/flipperzero-firmware}"
 FW_TAG="${FW_TAG:-1.4.3}"
 FW_REPO="https://github.com/flipperdevices/flipperzero-firmware.git"
@@ -83,10 +84,14 @@ for name in ["ble_hci_le", "ble_gap_aci", "ble_gatt_aci", "ble_hal_aci", "ble_l2
     print(">> patched " + p + ': extern "C" guards')
 PY
 
-# Link (or refresh) the app into the user apps directory.
+# Stage each app into applications_user, with the shared libble sources copied
+# alongside so the fap glob (*.c) picks them up.
 mkdir -p applications_user
-rm -rf applications_user/bt_inspector
-cp -r "$APP_SRC" applications_user/bt_inspector
+for app in "${APPS[@]}"; do
+    rm -rf "applications_user/$app"
+    cp -r "$HERE/$app" "applications_user/$app"
+    cp "$HERE"/libble/*.c "$HERE"/libble/*.h "applications_user/$app/"
+done
 
 FBT_ARGS=(
     COMPACT=1 DEBUG=0 # release build, same as official images
@@ -203,12 +208,12 @@ if enable_res:
 PY
 
 if [ "${1:-}" = "fap" ]; then
-    ./fbt -j"${JOBS:-4}" "${FBT_ARGS[@]}" fap_bt_inspector
-    echo ">> $(ls build/f7-firmware-C/.extapps/bt_inspector.fap)"
+    ./fbt -j"${JOBS:-4}" "${FBT_ARGS[@]}" "${APPS[@]/#/fap_}"
+    ls build/f7-firmware-C/.extapps/*.fap
     exit 0
 fi
 
-echo ">> building update package (full BLE stack + BT Inspector .fap)"
+echo ">> building update package (full BLE stack + apps)"
 ./fbt -j"${JOBS:-4}" "${FBT_ARGS[@]}" updater_package
 
 PKG=$(ls -d dist/f7-C/f7-update-* 2>/dev/null | head -1)
@@ -218,9 +223,9 @@ echo ">> radio stack in package:"
 grep -E "^Radio" "$PKG/update.fuf" || true
 echo ">> firmware size:"
 ls -l "$PKG/firmware.dfu"
-echo ">> app (also inside the package's resources, installed to apps/Bluetooth/):"
-ls -l build/f7-firmware-C/.extapps/bt_inspector.fap
-echo ">> SDK for building the app with ufbt: $(ls dist/f7-C/flipper-z-f7-sdk-*.zip)"
+echo ">> apps (also inside the package's resources, installed to apps/Bluetooth/):"
+ls -l build/f7-firmware-C/.extapps/*.fap
+echo ">> SDK for building the apps with ufbt: $(ls dist/f7-C/flipper-z-f7-sdk-*.zip)"
 echo
 echo "Install: copy '$PKG' to the SD card (e.g. /ext/update/) and run it from"
 echo "the file browser, or use: ./build.sh flash"
