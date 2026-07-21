@@ -135,12 +135,10 @@ EXPORT_ENABLE+='
 fi
 # RPC + loader internals: the public rpc_* / loader_* APIs (session open/feed/
 # close, app data exchange, launch/enqueue/lock/menu) are already exported by
-# stock firmware; enable them explicitly so they stay on, and add the internal
-# loader header set so apps can reach the internal Loader handle and helpers.
-EXPORT_ENABLE+='
-^rpc_
-^loader_
-'
+# stock firmware, so nothing is force-enabled here; this build only adds the
+# internal loader header set so apps can use the internal Loader types. The
+# internal helper functions stay unexported (see the "?" policy below): they are
+# not linked into the API table, and exporting them breaks the firmware link.
 export EXPORT_ENABLE
 
 # Add the loader internal headers to the SDK (rpc_i.h is skipped: it pulls the
@@ -199,7 +197,11 @@ for line in open(csv_path).read().splitlines():
             n_fw += 1
         parts[1] = "+"
     elif len(parts) >= 2 and parts[1] == "?":
-        parts[1] = "-" if parts[0] == "Variable" else "+"
+        # Headers are always enabled (their declarations must be available to the
+        # API table). New functions/variables default to disabled: only the ones
+        # explicitly enabled (BLE commands, EXPORT_ENABLE) are exported, so
+        # internal helpers pulled in by added headers stay out of the table.
+        parts[1] = "+" if parts[0] == "Header" else "-"
     out.append(",".join(parts))
 open(csv_path, "w").write("\n".join(out) + "\n")
 print(f">> BLE API export ({mode}): {n_on} of {len(owner)} aci_*/hci_* functions enabled")

@@ -174,7 +174,10 @@ Three facts about the Flipper Zero drive the design:
 Beyond the ST BLE commands, `build.sh` enables a set of firmware functions that
 stock firmware keeps internal, so any `.fap` on this firmware can use them. The
 set is a list of name patterns in `build.sh` (`EXPORT_ENABLE`); each enabled
-symbol costs one API-table entry.
+symbol costs one API-table entry. Only
+symbols named in `EXPORT_ENABLE` (plus the selected ST BLE commands) are
+exported; headers added for their types do not drag in every function they
+declare.
 
 * **BLE peripheral internals** (`gap_*`, safe `ble_glue_*`, `furi_hal_bt_init`):
   drive GAP directly, run a custom GATT server, change the advertised name and
@@ -194,12 +197,13 @@ symbol costs one API-table entry.
 * **RPC + loader internals**: the public `rpc_*` and `loader_*` APIs (RPC
   session open/feed/close, app data exchange, launching and enqueuing apps,
   lock/unlock, showing the app menu) are already exported by stock firmware and
-  are the supported way to script the Flipper from a host or launch other apps;
-  this build enables them explicitly and adds the internal loader headers
-  (`loader_i.h`, `loader_menu.h`, `loader_queue.h`, `loader_applications.h`) so
-  the internal loader/menu/queue helpers are reachable too. `rpc_i.h` is not
-  exported because it depends on the protobuf headers, which are not in the SDK;
-  the public RPC API covers host scripting.
+  are the supported way to script the Flipper from a host or launch other apps.
+  This build also adds the internal loader headers (`loader_i.h`,
+  `loader_menu.h`, `loader_queue.h`, `loader_applications.h`) so apps can use
+  the internal Loader types. The internal helper *functions* stay unexported:
+  they are not in the firmware's API-table link, so exporting them would break
+  the firmware build; only the public API is callable. `rpc_i.h` is not added
+  because it depends on the protobuf headers, which are not in the SDK.
 
 `build.sh` also widens the GAP roles the firmware initialises
 (`GAP_PERIPHERAL_ROLE | GAP_CENTRAL_ROLE | GAP_OBSERVER_ROLE`) in
