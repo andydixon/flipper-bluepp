@@ -230,6 +230,20 @@ firmware's peripheral connections by the role field. Advertising reports are
 parsed from the raw HCI payload (the ST header's `Advertising_Report_t` is not a
 wire overlay).
 
+## Sub-GHz region unlock (research)
+
+`build.sh` also patches the firmware's sub-GHz region gate so transmit is
+allowed on any frequency the CC1101 can tune, regardless of the device's
+provisioned region: `furi_hal_region_is_frequency_allowed` and
+`furi_hal_region_is_provisioned` are forced true. This is what most "unlocked"
+Flipper firmwares do. The CC1101 PLL bands (about 300-348, 387-464 and
+779-928 MHz) remain, because they are a hardware limit, not a regulatory one.
+
+**Transmitting outside the frequencies and power levels allocated to you may be
+illegal in your country. This is provided for research and authorised testing
+only; you are responsible for operating within the law.** Build with
+`SUBGHZ_UNLOCK=0 ./build.sh` to leave the region limits in place.
+
 ## Limitations
 
 * **BLE only.** The STM32WB55 has no Bluetooth Classic (BR/EDR), so classic

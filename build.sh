@@ -84,6 +84,35 @@ for name in ["ble_hci_le", "ble_gap_aci", "ble_gatt_aci", "ble_hal_aci", "ble_l2
     print(">> patched " + p + ': extern "C" guards')
 PY
 
+# Remove the sub-GHz region / frequency transmit limits (RESEARCH USE ONLY).
+# furi_hal_region_is_frequency_allowed gates TX vs RX-only per the provisioned
+# region; furi_hal_region_is_provisioned makes apps refuse to start unprovisioned.
+# Forcing both true allows transmit on any frequency the CC1101 hardware can
+# tune (the ~300-348 / 387-464 / 779-928 MHz PLL bands remain: they are physical,
+# not regulatory). Transmitting outside your local allocation may be illegal;
+# you are responsible for legal operation. Build with SUBGHZ_UNLOCK=0 to skip.
+if [ "${SUBGHZ_UNLOCK:-1}" = "1" ]; then
+python3 - targets/f7/furi_hal/furi_hal_region.c <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+patches = [
+    ("bool furi_hal_region_is_frequency_allowed(uint32_t frequency) {\n    return furi_hal_region_get_band(frequency) != NULL;\n}",
+     "bool furi_hal_region_is_frequency_allowed(uint32_t frequency) {\n    UNUSED(frequency);\n    return true; /* region limits removed (research build) */\n}"),
+    ("bool furi_hal_region_is_provisioned(void) {\n    return furi_hal_region_get() != NULL;\n}",
+     "bool furi_hal_region_is_provisioned(void) {\n    return true; /* region limits removed (research build) */\n}"),
+]
+changed = False
+for old, new in patches:
+    if old in s:
+        s = s.replace(old, new, 1)
+        changed = True
+if changed:
+    open(p, "w").write(s)
+    print(">> patched " + p + ": sub-GHz region/frequency TX limits removed")
+PY
+fi
+
 # Stage each app into applications_user, with the shared libble sources copied
 # alongside so the fap glob (*.c) picks them up.
 mkdir -p applications_user
