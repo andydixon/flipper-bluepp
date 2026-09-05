@@ -277,13 +277,14 @@ only; you are responsible for operating within the law.** Build with
 
 * **BLE only.** The STM32WB55 has no Bluetooth Classic (BR/EDR), so classic
   devices cannot be seen or connected from any Flipper.
-* **No pairing or bonding as central.** Neither app pairs, so anything gated
-  behind an encrypted link is out of reach: encrypted characteristics report
-  "Insufficient auth" / "Insufficient encryption", and keyboards that only send
-  reports after bonding stay silent.
-* At most two concurrent links (the firmware's BLE config), and while either app
+* **No pairing or bonding as central.** None of the central apps pair, so
+  anything gated behind an encrypted link is out of reach: encrypted
+  characteristics report "Insufficient auth" / "Insufficient encryption", and
+  keyboards that only send reports after bonding stay silent.
+* At most two concurrent links (the firmware's BLE config), and while a BLE app
   runs the Flipper's own advertising is stopped and any phone link dropped, then
   restored on exit.
+* The apps do not run at the same time; each one owns the radio while open.
 * Built and checked against firmware 1.4.3 as `.fap` apps; on-device behaviour
   needs a Flipper running the firmware from `build.sh` (full stack + exported
   API). The apps will not load on stock firmware (missing exported symbols).
@@ -308,6 +309,65 @@ only; you are responsible for operating within the law.** Build with
   just the reports as they arrive.
 * Only input reports are shown; output reports (LEDs) and feature reports are
   not driven.
+
+**BLE Sensor Dashboard**
+
+* Only characteristics with a known SIG UUID are shown, decoded by the shared
+  value decoders (battery, heart rate, temperature, humidity, pressure, Tx
+  power, time, appearance, PnP ID). Vendor-specific/custom sensor
+  characteristics are ignored, and each reading is a single field (no graphs or
+  unit conversions beyond what the decoder prints). Up to 12 readings.
+
+**BLE Tracker Detector**
+
+* Detection is signature-based (Apple Find My/AirTag manufacturer data, Tile and
+  Samsung SmartTag service UUIDs). Trackers using other schemes, or ones that
+  rotate their advertising identity, may be missed; a device that changes its
+  random address is counted as new. The "following" flag is a heuristic (seen
+  repeatedly over ~2 minutes), not proof, and there is no de-anonymisation.
+* Passive scan only; it never connects to or interacts with a tracker.
+
+**BLE GATT Fuzzer**
+
+* The fuzz pass writes a small fixed set of boundary payloads (empty, 0x00,
+  0xFF, 20 bytes of 'A') to writable characteristics; it is not a coverage-
+  guided or mutation fuzzer and does not chase crashes. **Writing arbitrary
+  values can misconfigure or brick the target.** Use only on devices you own or
+  are authorised to test.
+* Reads are truncated to the value length the peripheral returns; the on-screen
+  feed shows the first bytes, the log has the run.
+
+**BLE Beacon Toolkit**
+
+* iBeacon mode expects exactly 21 entered bytes (16 UUID + 2 major + 2 minor +
+  1 Tx) and wraps them in the Apple manufacturer AD; Raw mode sends the entered
+  bytes verbatim, up to 31. There is no validation that a raw payload is
+  well-formed AD. Config changes take effect on the next Start (Stop first).
+* Legacy advertising only (no extended advertising / BLE 5 long range).
+
+**BLE GATT Server**
+
+* It exposes the firmware's fixed serial GATT service (a 128-bit service with RX
+  and TX characteristics) and echoes writes; it is not an arbitrary
+  user-defined GATT schema. Building custom services from a `.fap` is not
+  supported by the exported API. It takes over the BLE profile while open and
+  restores the default (phone/RPC) profile on exit.
+
+**Sub-GHz Scanner / Spectrum**
+
+* RSSI is read one frequency at a time through the CC1101 with a fixed OOK
+  preset and a short settle delay, so a sweep is slow and can miss brief
+  transmissions between steps; the reading reflects that preset's bandwidth, not
+  a true FFT. Frequencies are limited to the CC1101 PLL bands.
+* These use the shared radio directly; do not run them alongside the stock
+  Sub-GHz app. Transmitting is not performed, but see the sub-GHz unlock note
+  below regarding legality.
+
+**Battery Health**
+
+* All figures come straight from the fuel-gauge IC; "wear" is derived from
+  full-vs-design capacity and is only a rough estimate. Read-only: it never
+  changes charge settings. It is the one app that also runs on stock firmware.
 
 **Exported firmware APIs (unlocks)**
 
