@@ -245,7 +245,7 @@ static void decode_apple(FuriString* out, const uint8_t* d, uint8_t len) {
         switch(type) {
         case 0x02:
             furi_string_cat_str(out, "  iBeacon");
-            if(l >= 20) {
+            if(l >= 21) { // 16 UUID + 2 major + 2 minor + 1 Tx; p[20] is the Tx byte
                 furi_string_cat_str(out, " ");
                 for(int k = 0; k < 16; k++) furi_string_cat_printf(out, "%02X", p[k]);
                 furi_string_cat_printf(
