@@ -131,15 +131,17 @@ int32_t ble_gattsrv_app(void* p) {
         }
     }
 
-    gui_remove_view_port(app->gui, app->vp);
-    view_port_free(app->vp);
-    furi_record_close(RECORD_GUI);
+    // Unhook every callback that runs on the BLE/BT thread BEFORE freeing the
+    // view port, or serial_cb/status_cb can call view_port_update on freed memory.
     if(app->profile) {
         ble_profile_serial_set_event_callback(app->profile, 0, NULL, NULL);
         bt_profile_restore_default(app->bt);
     }
     bt_set_status_changed_callback(app->bt, NULL, NULL);
     furi_record_close(RECORD_BT);
+    gui_remove_view_port(app->gui, app->vp);
+    view_port_free(app->vp);
+    furi_record_close(RECORD_GUI);
     furi_message_queue_free(app->input);
     furi_mutex_free(app->mutex);
     free(app);
