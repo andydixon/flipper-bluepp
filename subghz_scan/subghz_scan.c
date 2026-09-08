@@ -89,7 +89,14 @@ static int32_t scan_thread(void* ctx) {
         float peak = -127.0f;
         for(int i = 0; i < nb && app->active; i++) {
             uint32_t f = rs + (uint32_t)i * step;
-            if(!furi_hal_subghz_is_frequency_valid(f)) continue;
+            if(!furi_hal_subghz_is_frequency_valid(f)) {
+                // Band gaps (e.g. in the all-bands sweep): report a floor, not a
+                // stale reading left in the bin from a previous pass.
+                furi_mutex_acquire(app->mutex, FuriWaitForever);
+                app->m.bins[i] = -127.0f;
+                furi_mutex_release(app->mutex);
+                continue;
+            }
             furi_hal_subghz_idle();
             furi_hal_subghz_set_frequency_and_path(f);
             furi_hal_subghz_flush_rx();
