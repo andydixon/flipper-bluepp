@@ -12,5 +12,5 @@ App(
     fap_version="1.0",
     fap_description="Connect a BLE keyboard or mouse and watch its input reports",
     fap_author="andydixon",
-    fap_weburl="https://github.com/andydixon/flipper-bt-inspector",
+    fap_weburl="https://github.com/andydixon/flipper-bluepp",
 )
