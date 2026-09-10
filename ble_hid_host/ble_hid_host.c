@@ -84,6 +84,7 @@ typedef struct {
     Sub subs[SUBS_MAX];
     int sub_count;
     bool connected_ok;
+    volatile bool cancel;
     char setup_msg[48];
 } App;
 
@@ -94,6 +95,8 @@ typedef struct {
 } NotifyMsg;
 
 // ---- logging ----------------------------------------------------------------
+
+static App* s_app; // popup Back callback (popup view ctx isn't the App)
 
 static void app_log(App* app, const char* fmt, ...) {
     if(!app->log) return;
@@ -240,7 +243,13 @@ static int32_t worker_thread(void* ctx) {
     while(furi_message_queue_get(app->jobs, &job, FuriWaitForever) == FuriStatusOk) {
         if(job == JobQuit) break;
         if(job == JobConnect) {
-            app->connected_ok = bc_connect(app->bc, &app->dev, 8000) && hid_setup(app);
+            bool ok = bc_connect(app->bc, &app->dev, 8000) && hid_setup(app);
+            if(app->cancel) {
+                if(bc_is_connected(app->bc)) bc_disconnect(app->bc);
+                bc_scan_start(app->bc);
+                ok = false;
+            }
+            app->connected_ok = ok;
         } else if(job == JobDisconnect) {
             bc_disconnect(app->bc);
             bc_scan_start(app->bc);
@@ -442,9 +451,11 @@ static uint32_t nav_mon_back(void* ctx) {
     return ViewScan;
 }
 
-static uint32_t nav_stay_popup(void* ctx) {
+static uint32_t nav_connecting_back(void* ctx) {
     UNUSED(ctx);
-    return ViewPopup;
+    s_app->cancel = true;
+    s_app->cur_view = ViewScan;
+    return ViewScan;
 }
 
 // ---- events -----------------------------------------------------------------
@@ -508,12 +519,17 @@ static bool custom_event_cb(void* ctx, uint32_t event) {
             false);
         if(have) {
             app_log(app, "CONNECTING %s", dev_label(&app->dev));
+            app->cancel = false;
             show_popup(app, "Connecting...", dev_label(&app->dev), false);
             furi_message_queue_put(app->jobs, &(JobType){JobConnect}, 0);
         }
     } break;
     case EvtNotify: on_notify(app); break;
     case EvtJobDone:
+        if(app->cancel) {
+            app->cancel = false;
+            break;
+        }
         if(app->connected_ok) {
             char hdr[40];
             snprintf(hdr, sizeof(hdr), "%s", dev_label(&app->dev));
@@ -554,6 +570,7 @@ int32_t ble_hid_host_app(void* p) {
     UNUSED(p);
     App* app = malloc(sizeof(App));
     memset(app, 0, sizeof(App));
+    s_app = app;
     app->gui = furi_record_open(RECORD_GUI);
     app->storage = furi_record_open(RECORD_STORAGE);
     app->jobs = furi_message_queue_alloc(8, sizeof(JobType));
@@ -582,7 +599,7 @@ int32_t ble_hid_host_app(void* p) {
     view_dispatcher_add_view(app->vd, ViewMonitor, app->mon_view);
 
     app->popup = popup_alloc();
-    view_set_previous_callback(popup_get_view(app->popup), nav_stay_popup);
+    view_set_previous_callback(popup_get_view(app->popup), nav_connecting_back);
     view_dispatcher_add_view(app->vd, ViewPopup, popup_get_view(app->popup));
 
     app->timer = furi_timer_alloc(timer_cb, FuriTimerTypePeriodic, app);

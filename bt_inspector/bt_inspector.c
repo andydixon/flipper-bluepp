@@ -129,6 +129,7 @@ typedef struct {
 
     JobType job;
     bool job_ok;
+    volatile bool cancel;
     FuriString* status;
     FuriString* info_text;
 } App;
@@ -853,7 +854,10 @@ static uint32_t nav_exit(void* ctx) {
 
 static uint32_t nav_stay_popup(void* ctx) {
     UNUSED(ctx);
-    return ViewPopup;
+    // Back on a connect/discover popup: abort and return to the scan list.
+    nav_app->cancel = true;
+    nav_app->cur_view = ViewScan;
+    return ViewScan;
 }
 
 static uint32_t nav_page_back(void* ctx) {
@@ -916,6 +920,16 @@ static void on_tick(App* app) {
 }
 
 static void on_job_done(App* app) {
+    if(app->cancel) { // user backed out of the connect/discover popup
+        app->cancel = false;
+        if(app->job != JobDisconnect) {
+            if(bc_is_connected(app->bc))
+                post_job(app, JobDisconnect);
+            else
+                bc_scan_start(app->bc);
+        }
+        return;
+    }
     switch(app->job) {
     case JobConnect:
         if(app->job_ok) {
@@ -1038,6 +1052,7 @@ static bool custom_event_cb(void* ctx, uint32_t event) {
     case EvtPageCenter:
         if(app->page_kind == PageDetails) {
             app_log(app, "CONNECTING %s", dev_label(&app->dev));
+            app->cancel = false;
             show_popup(app, "Connecting...", dev_label(&app->dev), false);
             post_job(app, JobConnect);
         } else if(app->page_kind == PageChar) {
@@ -1059,6 +1074,12 @@ static bool custom_event_cb(void* ctx, uint32_t event) {
     case EvtJobDone: on_job_done(app); break;
     case EvtNotify: on_notify(app); break;
     case EvtPopupDone:
+        if(app->cancel) {
+            app->cancel = false;
+            bc_scan_start(app->bc);
+            show_view(app, ViewScan);
+            break;
+        }
         if(app->after_popup == AfterPopupServices) {
             show_view(app, ViewServices);
         } else {
