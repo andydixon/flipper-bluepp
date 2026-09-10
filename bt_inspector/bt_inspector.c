@@ -597,6 +597,32 @@ static uint16_t char_end_handle(App* app) {
     return app->services[app->svc_sel].end;
 }
 
+// If the device advertised no name, read the GAP Device Name (0x2A00) over the
+// connection so the device page and service list show its real name, not just
+// the vendor. Runs on the worker thread right after service discovery.
+static void resolve_name(App* app) {
+    if(app->dev.name[0]) return; // already have an advertised name
+    for(int i = 0; i < app->svc_count; i++) {
+        BcService* s = &app->services[i];
+        if(!(s->uuid_len == 2 && (s->uuid[0] | (s->uuid[1] << 8)) == 0x1800)) continue; // GAP
+        BcChar tmp[8];
+        int n = bc_discover_chars(app->bc, s, tmp, COUNT_OF(tmp));
+        for(int k = 0; k < n; k++) {
+            uint16_t u = tmp[k].uuid_len == 2 ? (tmp[k].uuid[0] | (tmp[k].uuid[1] << 8)) : 0;
+            if(u != 0x2A00 || !(tmp[k].props & CHAR_PROP_READ)) continue;
+            uint8_t val[BC_NAME_MAX + 1];
+            int len = bc_read(app->bc, tmp[k].value_handle, val, BC_NAME_MAX);
+            if(len > 0) {
+                memcpy(app->dev.name, val, len);
+                app->dev.name[len] = 0;
+                app_log(app, "NAME resolved: %s", app->dev.name);
+            }
+            return;
+        }
+        return; // found GAP but no readable name
+    }
+}
+
 static void do_info(App* app) {
     furi_string_printf(app->info_text, "%s\nMTU %u\n", dev_label(&app->dev), bc_mtu(app->bc));
     FuriString* label = furi_string_alloc();
@@ -645,6 +671,7 @@ static int32_t worker_thread(void* ctx) {
             int n = bc_discover_services(app->bc, app->services, BC_MAX_SERVICES);
             app->svc_count = n < 0 ? 0 : n;
             ok = n >= 0;
+            if(ok) resolve_name(app);
         } break;
         case JobChars: {
             int n = bc_discover_chars(app->bc, &app->services[app->svc_sel], app->chars, BC_MAX_CHARS);
