@@ -89,6 +89,7 @@ typedef struct {
     BleCentral* bc;
     Tracker db[BC_MAX_DEVICES];
     size_t db_count;
+    BcDevice snap[BC_MAX_DEVICES]; // snapshot scratch (kept off the stack)
 } App;
 
 static void app_log(App* app, const char* fmt, ...) {
@@ -107,7 +108,7 @@ static void app_log(App* app, const char* fmt, ...) {
 }
 
 static void tick(App* app) {
-    BcDevice snap[BC_MAX_DEVICES];
+    BcDevice* snap = app->snap;
     size_t n = bc_snapshot(app->bc, snap, BC_MAX_DEVICES);
     uint32_t now = furi_get_tick();
     for(size_t i = 0; i < n; i++) {
@@ -155,15 +156,6 @@ static void tick(App* app) {
                 m->items[i].last_seen = app->db[i].last_seen;
                 m->items[i].hits = app->db[i].hits;
                 m->items[i].warned = app->db[i].warned;
-            }
-            for(size_t i = 1; i < m->count; i++) { // insertion sort by rssi
-                Tracker t = m->items[i];
-                size_t j = i;
-                while(j > 0 && m->items[j - 1].rssi < t.rssi) {
-                    m->items[j] = m->items[j - 1];
-                    j--;
-                }
-                m->items[j] = t;
             }
             if(m->sel >= m->count) m->sel = m->count ? m->count - 1 : 0;
             if(m->sel < m->top) m->top = m->sel;
@@ -227,8 +219,14 @@ static uint32_t exit_cb(void* ctx) {
     return VIEW_NONE;
 }
 
+static bool tracker_custom(void* ctx, uint32_t event) {
+    if(event == 1) tick((App*)ctx);
+    return true;
+}
+
 static void timer_cb(void* ctx) {
-    tick((App*)ctx);
+    App* app = ctx;
+    view_dispatcher_send_custom_event(app->vd, 1);
 }
 
 int32_t ble_tracker_app(void* p) {
@@ -239,6 +237,8 @@ int32_t ble_tracker_app(void* p) {
     app->storage = furi_record_open(RECORD_STORAGE);
 
     app->vd = view_dispatcher_alloc();
+    view_dispatcher_set_event_callback_context(app->vd, app);
+    view_dispatcher_set_custom_event_callback(app->vd, tracker_custom);
     view_dispatcher_attach_to_gui(app->vd, app->gui, ViewDispatcherTypeFullscreen);
     app->view = view_alloc();
     view_allocate_model(app->view, ViewModelTypeLocking, sizeof(ListModel));
