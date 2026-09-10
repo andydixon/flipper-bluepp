@@ -59,25 +59,24 @@ static void draw_cb(Canvas* c, void* ctx) {
     char buf[64];
     canvas_clear(c);
     canvas_set_font(c, FontPrimary);
-    snprintf(buf, sizeof(buf), "Battery %u%%", m->pct);
-    canvas_draw_str(c, 2, 9, buf);
-    const char* st = m->charged ? "full" : m->charging ? "charging" : "discharging";
+    canvas_draw_str(c, 2, 9, "Battery Health");
+    const char* st = m->charged ? "full" : m->charging ? "chging" : "dischg";
     canvas_set_font(c, FontSecondary);
-    canvas_draw_str_aligned(c, 126, 9, AlignRight, AlignBottom, st);
     canvas_draw_line(c, 0, 11, 127, 11);
 
-    snprintf(buf, sizeof(buf), "%.3f V   %+.0f mA   %.1f C", (double)m->v, (double)(m->i * 1000), (double)m->temp);
-    canvas_draw_str(c, 2, 21, buf);
-    snprintf(
-        buf, sizeof(buf), "%lu/%lu mAh (design %lu)", (unsigned long)m->rem_mah,
-        (unsigned long)m->full_mah, (unsigned long)m->design_mah);
-    canvas_draw_str(c, 2, 31, buf);
+    // Compact rows, each kept within the 128 px width.
+    snprintf(buf, sizeof(buf), "%u%%  %.2fV  %s", m->pct, (double)m->v, st);
+    canvas_draw_str(c, 2, 20, buf);
+    snprintf(buf, sizeof(buf), "%dmA  %.0fC  VBUS%.1f", (int)(m->i * 1000), (double)m->temp, (double)m->vbus);
+    canvas_draw_str(c, 2, 30, buf);
     int wear = m->design_mah ? 100 - (int)(m->full_mah * 100 / m->design_mah) : 0;
-    snprintf(buf, sizeof(buf), "Health %u%%  Wear %d%%  VBUS %.2fV", m->health, wear, (double)m->vbus);
-    canvas_draw_str(c, 2, 41, buf);
+    snprintf(
+        buf, sizeof(buf), "%lu/%lumAh H%u%% W%d%%", (unsigned long)m->rem_mah,
+        (unsigned long)m->full_mah, m->health, wear);
+    canvas_draw_str(c, 2, 40, buf);
 
     // Voltage graph, auto-scaled to 3.3-4.2 V window.
-    int gx = 2, gy = 45, gw = GRAPH_N, gh = 17;
+    int gx = 2, gy = 44, gw = GRAPH_N, gh = 17;
     canvas_draw_frame(c, gx, gy, gw + 2, gh + 2);
     for(int k = 0; k < m->graph_count; k++) {
         float v = m->graph[k];
