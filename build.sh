@@ -116,6 +116,33 @@ if changed:
 PY
 fi
 
+# Don't validate the CPU2-controlled secure-region option bytes against the
+# stock reference. The updater's OB validation stage compares device option
+# bytes to scripts/ob.data; that reference is tuned for the LIGHT stack (SFSA
+# 0x080D7000, SBRV 0x0D7000>>2). Installing the FULL stack makes CPU2 move the
+# secure boundary (SFSA -> 0xCE, SBRV -> 0x0CE000>>2, plus the SRAM2 secure
+# boundaries), so the compare fails with "Uncorr. value mismatch #[8-93]" right
+# after the radio installs. These bytes are read-only (only CPU2 sets them) and
+# are correct-by-construction once the radio install has succeeded, so exclude
+# them from the compare. The user-controllable OBs (RDP, BOR, boot config,
+# watchdogs, PCROP, WRP) are still validated. obdata.py skips '#'-commented lines.
+python3 - scripts/ob.data <<'PY'
+import sys
+p = sys.argv[1]
+secure = {"SFSA", "FSD", "DDS", "C2OPT", "NBRSD", "SNBRSA", "BRSD", "SBRSA", "SBRV"}
+out, changed = [], False
+for line in open(p).read().splitlines():
+    name = line.split(":", 1)[0].strip()
+    if name in secure and not line.startswith("#"):
+        out.append("# " + line + "  # Blue++: CPU2-set for full stack, not validated")
+        changed = True
+    else:
+        out.append(line)
+if changed:
+    open(p, "w").write("\n".join(out) + "\n")
+    print(">> patched " + p + ": exclude CPU2 secure-region OBs from validation")
+PY
+
 # Stage each app into applications_user, with the shared libble sources copied
 # alongside so the fap glob (*.c) picks them up.
 mkdir -p applications_user
