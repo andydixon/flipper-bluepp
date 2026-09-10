@@ -51,7 +51,7 @@ Environment variables:
 
 | Var | Default | Effect |
 |---|---|---|
-| `BLE_API` | `hci,gatt` | Which ST command groups to export (`min`, `all`, or any comma list of `hci,gap,gatt,hal,l2cap`). |
+| `BLE_API` | `all` | Which ST command groups to export (`all`, `min`, or any comma list of `hci,gap,gatt,hal,l2cap`). |
 | `EXPORT_FLASH` | `1` | Export the raw flash / option-byte API (set `0` to omit). |
 | `SUBGHZ_UNLOCK` | `1` | Remove the sub-GHz region gate (set `0` to keep it). |
 | `FW_TAG` | `1.4.3` | Firmware tag to clone. |
@@ -280,8 +280,8 @@ between the firmware and the stack is the Flipper's internal storage:
 | `BLE_API` | exported | firmware | pages free, full stack | pages free, extended stack |
 |---|---|---|---|---|
 | `min` (only what the apps import) | 15 | 770 KB | 18 | 9 |
-| `hci,gatt` (default) | 127 | 779 KB | 15 | 6 |
-| `all` | 211 | ~788 KB | 13 | 4 |
+| `hci,gatt` | 127 | 779 KB | 15 | 6 |
+| `all` (default) | 211 | ~788 KB | 13 | 4 |
 | stock light-stack firmware | 0 | 768 KB | 27 | n/a |
 
 `extended` refers to `stm32wb5x_BLE_Stack_full_extended_fw.bin` (BLE 5 extended
