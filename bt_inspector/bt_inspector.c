@@ -66,6 +66,7 @@ typedef struct {
     BcDevice devs[BC_MAX_DEVICES];
     size_t count, sel, top;
     bool scanning;
+    uint8_t scan_err;
 } ScanModel;
 
 typedef struct {
@@ -328,7 +329,10 @@ static void scan_draw(Canvas* c, void* m_) {
     canvas_set_font(c, FontPrimary);
     canvas_draw_str(c, 2, 9, "BT Inspector");
     canvas_set_font(c, FontSecondary);
-    furi_string_printf(s, m->scanning ? "%u found" : "%u (stopped)", (unsigned)m->count);
+    if(m->scanning)
+        furi_string_printf(s, "%u found", (unsigned)m->count);
+    else
+        furi_string_printf(s, "err 0x%02X", m->scan_err);
     canvas_draw_str_aligned(c, 126, 9, AlignRight, AlignBottom, furi_string_get_cstr(s));
     canvas_draw_line(c, 0, 11, 127, 11);
     if(!m->count) canvas_draw_str_aligned(c, 64, 40, AlignCenter, AlignCenter, "Scanning...");
@@ -389,7 +393,8 @@ static void scan_enter(void* ctx) {
     app->cur_view = ViewScan;
     bool ok = bc_scan_start(app->bc);
     if(!ok) app_log(app, "SCAN START FAILED 0x%02X", bc_last_error(app->bc));
-    with_view_model(app->scan_view, ScanModel * m, { m->scanning = ok; }, true);
+    uint8_t err = ok ? 0 : bc_last_error(app->bc);
+    with_view_model(app->scan_view, ScanModel * m, { m->scanning = ok; m->scan_err = err; }, true);
 }
 
 // ---- page view (scrollable text with optional buttons) -----------------------
