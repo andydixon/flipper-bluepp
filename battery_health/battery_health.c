@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 // Battery Health: live fuel-gauge readings (voltage, current, temperature,
 // capacity, health, charge state) with a rolling voltage graph. Read-only.
 #include <furi.h>

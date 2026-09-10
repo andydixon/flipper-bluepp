@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 // Sub-GHz Scanner: sweep RSSI across a frequency range in fixed steps, show the
 // strongest bins, and log any frequency whose RSSI crosses a threshold. Uses the
 // region-unlocked firmware so the whole hardware-tunable range is available.

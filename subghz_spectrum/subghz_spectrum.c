@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 // Sub-GHz Spectrum: sweep a centre +/- span window, drawing a live spectrum bar
 // graph and a scrolling waterfall of RSSI over time. Left/Right retune the
 // centre, Up/Down change the span. Region-unlocked so any hardware-tunable

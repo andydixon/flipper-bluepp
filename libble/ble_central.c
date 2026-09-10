@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 #include "ble_central.h"
 #include <furi_hal.h>
 #include <furi_ble/event_dispatcher.h>

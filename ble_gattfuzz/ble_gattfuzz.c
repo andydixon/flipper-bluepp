@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 // BLE GATT Fuzzer / logger: connect to a selected peripheral, walk every
 // service and characteristic, read all readable values, and (optionally) write
 // a set of boundary payloads to writable characteristics, logging every
