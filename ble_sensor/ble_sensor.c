@@ -70,8 +70,11 @@ typedef struct {
     BcService services[BC_MAX_SERVICES];
     BcChar chars[BC_MAX_CHARS];
     bool connected_ok;
+    volatile bool cancel;
     char setup_msg[40];
 } App;
+
+static App* s_app; // for the popup Back callback (popup view ctx isn't the App)
 
 static const char* dev_label(const BcDevice* d) {
     return d->name[0] ? d->name : "(no name)";
@@ -139,9 +142,15 @@ static int32_t worker_thread(void* ctx) {
     JobType job;
     while(furi_message_queue_get(app->jobs, &job, FuriWaitForever) == FuriStatusOk) {
         if(job == JobQuit) break;
-        if(job == JobConnect)
-            app->connected_ok = bc_connect(app->bc, &app->dev, 8000) && sensor_setup(app);
-        else if(job == JobDisconnect) {
+        if(job == JobConnect) {
+            bool ok = bc_connect(app->bc, &app->dev, 8000) && sensor_setup(app);
+            if(app->cancel) { // user pressed Back while we were busy
+                if(bc_is_connected(app->bc)) bc_disconnect(app->bc);
+                bc_scan_start(app->bc);
+                ok = false;
+            }
+            app->connected_ok = ok;
+        } else if(job == JobDisconnect) {
             bc_disconnect(app->bc);
             bc_scan_start(app->bc);
         }
@@ -288,9 +297,11 @@ static uint32_t scan_exit(void* ctx) {
     UNUSED(ctx);
     return VIEW_NONE;
 }
-static uint32_t stay_popup(void* ctx) {
+static uint32_t connecting_back(void* ctx) {
     UNUSED(ctx);
-    return ViewPopup;
+    s_app->cancel = true; // worker will drop the half-made connection
+    s_app->cur = ViewScan;
+    return ViewScan;
 }
 
 static void popup_cb(void* ctx) {
@@ -343,6 +354,7 @@ static bool custom_cb(void* ctx, uint32_t event) {
             popup_set_context(app->popup, app);
             popup_set_header(app->popup, "Connecting...", 64, 26, AlignCenter, AlignCenter);
             popup_set_text(app->popup, dev_label(&app->dev), 64, 40, AlignCenter, AlignCenter);
+            app->cancel = false;
             app->cur = ViewPopup;
             view_dispatcher_switch_to_view(app->vd, ViewPopup);
             furi_message_queue_put(app->jobs, &(JobType){JobConnect}, 0);
@@ -350,6 +362,10 @@ static bool custom_cb(void* ctx, uint32_t event) {
     } break;
     case EvtNotify: on_notify(app); break;
     case EvtJobDone:
+        if(app->cancel) { // user already backed out to the scan list
+            app->cancel = false;
+            break;
+        }
         if(app->connected_ok) {
             with_view_model(
                 app->readings_view, ReadingsModel * m,
@@ -383,6 +399,7 @@ int32_t ble_sensor_app(void* p) {
     UNUSED(p);
     App* app = malloc(sizeof(App));
     memset(app, 0, sizeof(App));
+    s_app = app;
     app->gui = furi_record_open(RECORD_GUI);
     app->jobs = furi_message_queue_alloc(8, sizeof(JobType));
     app->notify_q = furi_message_queue_alloc(16, sizeof(NotifyMsg));
@@ -410,7 +427,7 @@ int32_t ble_sensor_app(void* p) {
     view_dispatcher_add_view(app->vd, ViewReadings, app->readings_view);
 
     app->popup = popup_alloc();
-    view_set_previous_callback(popup_get_view(app->popup), stay_popup);
+    view_set_previous_callback(popup_get_view(app->popup), connecting_back);
     view_dispatcher_add_view(app->vd, ViewPopup, popup_get_view(app->popup));
 
     app->timer = furi_timer_alloc(timer_cb, FuriTimerTypePeriodic, app);
