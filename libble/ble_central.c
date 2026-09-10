@@ -9,6 +9,7 @@
 #include <ble/core/auto/ble_vs_codes.h>
 #include <ble/core/auto/ble_hci_le.h>
 #include <ble/core/auto/ble_gatt_aci.h>
+#include <ble/core/auto/ble_gap_aci.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -314,9 +315,11 @@ void bc_free(BleCentral* bc) {
 
 bool bc_scan_start(BleCentral* bc) {
     if(bc->scanning) return true;
-    // active scan, 50 ms interval / 30 ms window; no duplicate filtering so RSSI stays live
-    tBleStatus st = hci_le_set_scan_parameters(0x01, 0x50, 0x30, OWN_ADDR_TYPE, 0x00);
-    if(st == BLE_STATUS_SUCCESS) st = hci_le_set_scan_enable(0x01, 0x00);
+    // Active scan, 50 ms interval / 30 ms window, public address, no duplicate
+    // filtering (so RSSI stays live), accept-all filter policy. The firmware's
+    // GAP is initialised, so we must use the GAP observation procedure; raw
+    // hci_le_set_scan_* returns "command disallowed" in that state.
+    tBleStatus st = aci_gap_start_observation_proc(0x0050, 0x0030, 0x01, OWN_ADDR_TYPE, 0x00, 0x00);
     if(st != BLE_STATUS_SUCCESS) {
         FURI_LOG_E(TAG, "scan start failed: 0x%02X", st);
         bc->last_error = st;
@@ -328,7 +331,7 @@ bool bc_scan_start(BleCentral* bc) {
 
 void bc_scan_stop(BleCentral* bc) {
     if(!bc->scanning) return;
-    hci_le_set_scan_enable(0x00, 0x00);
+    aci_gap_terminate_gap_proc(GAP_OBSERVATION_PROC);
     bc->scanning = false;
 }
 
@@ -407,9 +410,11 @@ bool bc_connect(BleCentral* bc, const BcDevice* dev, uint32_t timeout_ms) {
     furi_event_flag_clear(bc->flags, FlagConnected | FlagConnFailed | FlagDisconnected | FlagDone);
     bc->connecting = true;
     bc->mtu = 23;
+    // Observation must fully stop before starting a connection procedure.
+    furi_delay_ms(100);
     // scan 60/30 ms, conn interval 30-50 ms, latency 0, supervision 5 s
-    tBleStatus st = hci_le_create_connection(
-        0x60, 0x30, 0x00, dev->addr_type, dev->addr, OWN_ADDR_TYPE, 0x18, 0x28, 0, 0x01F4, 0, 0);
+    tBleStatus st = aci_gap_create_connection(
+        0x60, 0x30, dev->addr_type, dev->addr, OWN_ADDR_TYPE, 0x18, 0x28, 0, 0x01F4, 0, 0);
     if(st != BLE_STATUS_SUCCESS) {
         FURI_LOG_E(TAG, "create_connection failed: 0x%02X", st);
         bc->connecting = false;
@@ -418,7 +423,7 @@ bool bc_connect(BleCentral* bc, const BcDevice* dev, uint32_t timeout_ms) {
     }
     uint32_t f = furi_event_flag_wait(bc->flags, FlagConnected | FlagConnFailed, FuriFlagWaitAny, timeout_ms);
     if(f & FuriFlagError) {
-        hci_le_create_connection_cancel();
+        aci_gap_terminate_gap_proc(GAP_DIRECT_CONNECTION_ESTABLISHMENT_PROC);
         f = furi_event_flag_wait(bc->flags, FlagConnected | FlagConnFailed, FuriFlagWaitAny, 2000);
         if(!(f & FlagConnected)) {
             bc->connecting = false;
