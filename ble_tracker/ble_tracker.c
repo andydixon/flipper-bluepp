@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 // BLE Tracker Detector: passively scan and flag nearby item trackers by their
 // advertising signatures (Apple Find My / AirTag, Tile, Samsung SmartTag), plus
 // a "following" warning for a tracker seen persistently over time. Read-only.

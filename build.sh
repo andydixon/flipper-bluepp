@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 # Flipper Blue++ - build a Flipper Zero firmware update package with ST's full
 # BLE stack, the BLE command API exported to apps, and the Blue++ app suite.
 #

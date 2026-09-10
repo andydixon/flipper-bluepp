@@ -452,3 +452,20 @@ Each app directory holds its `application.fam`, `icon.png` and sources. To add
 an app, drop a directory next to these and add its name to `APPS=(...)` in
 `build.sh`; if it includes `ble_central.h`, `build.sh` stages `libble` into it
 automatically.
+
+---
+
+## License
+
+Flipper Blue++ is licensed under the **GNU General Public License v3.0 or
+later** (see [`LICENSE`](LICENSE)), matching the Flipper Zero firmware it builds
+on and links against. Every original source file carries an SPDX header.
+
+- The app sources (`libble/`, `bt_inspector/`, `ble_hid_host/`, `ble_sensor/`,
+  `ble_tracker/`, `ble_gattfuzz/`, `ble_beacon/`, `ble_gattsrv/`, `subghz_scan/`,
+  `subghz_spectrum/`, `battery_health/`) and `build.sh` are
+  © 2026 Andy Dixon &lt;andy@dixon.cx&gt;.
+- The Flipper Zero firmware and SDK that `build.sh` clones and builds are
+  © Flipper Devices Inc. and contributors, also under GPLv3. This repository
+  does not redistribute that source; `build.sh` fetches it from the upstream
+  repository at build time.

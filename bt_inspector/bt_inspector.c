@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 // BT Inspector: BLE scanner + GATT explorer for Flipper Zero (full-stack firmware build).
 #include <furi.h>
 #include <furi_hal.h>

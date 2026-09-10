@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 // BLE HID Host: connect to a Bluetooth Low Energy keyboard or mouse and show
 // its input reports live. Reuses the libble central/GATT layer. Needs the
 // full BLE stack + exported ST command API (see ../build.sh).
