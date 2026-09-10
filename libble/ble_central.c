@@ -351,10 +351,12 @@ size_t bc_snapshot(BleCentral* bc, BcDevice* out, size_t max) {
         d->logged = true;
     }
     furi_mutex_release(bc->mutex);
-    for(size_t i = 1; i < n; i++) { // insertion sort by RSSI, strongest first (n <= 32)
+    // Order by discovery time (first seen) so the list is stable and doesn't
+    // jump around as RSSI changes. Insertion sort, n <= 32.
+    for(size_t i = 1; i < n; i++) {
         BcDevice d = out[i];
         size_t j = i;
-        while(j > 0 && out[j - 1].rssi < d.rssi) {
+        while(j > 0 && out[j - 1].first_seen > d.first_seen) {
             out[j] = out[j - 1];
             j--;
         }
