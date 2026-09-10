@@ -146,7 +146,7 @@ static void draw_cb(Canvas* c, void* ctx) {
         (unsigned long)(m->range_end / 1000 % 1000));
     canvas_draw_str(c, 2, 20, buf);
     snprintf(
-        buf, sizeof(buf), "peak %lu.%03lu MHz %d dBm", (unsigned long)(m->peak_freq / 1000000),
+        buf, sizeof(buf), "pk %lu.%03luM %ddBm", (unsigned long)(m->peak_freq / 1000000),
         (unsigned long)(m->peak_freq / 1000 % 1000), (int)m->peak_rssi);
     canvas_draw_str(c, 2, 29, buf);
 
@@ -159,7 +159,7 @@ static void draw_cb(Canvas* c, void* ctx) {
         int h = (int)((r + 110) / 70.0f * gh);
         canvas_draw_line(c, i, gy + gh - h, i, gy + gh);
     }
-    canvas_draw_str(c, 2, 63, "OK pause  <>band  Back exit");
+    canvas_draw_str(c, 2, 63, "OK:pause  <>:band");
     furi_mutex_release(app->mutex);
 }
 
