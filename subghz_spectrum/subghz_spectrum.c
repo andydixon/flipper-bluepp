@@ -95,12 +95,10 @@ static void draw_cb(Canvas* c, void* ctx) {
     canvas_clear(c);
     canvas_set_font(c, FontSecondary);
     snprintf(
-        buf, sizeof(buf), "%lu.%03lu MHz +-%lu kHz", (unsigned long)(m->center / 1000000),
+        buf, sizeof(buf), "%lu.%03lu +-%luk", (unsigned long)(m->center / 1000000),
         (unsigned long)(m->center / 1000 % 1000), (unsigned long)(m->span / 2000));
     canvas_draw_str(c, 1, 8, buf);
-    snprintf(
-        buf, sizeof(buf), "pk %lu.%03lu %d", (unsigned long)(m->peak_freq / 1000000),
-        (unsigned long)(m->peak_freq / 1000 % 1000), (int)m->peak_rssi);
+    snprintf(buf, sizeof(buf), "%ddBm", (int)m->peak_rssi);
     canvas_draw_str_aligned(c, 127, 8, AlignRight, AlignBottom, buf);
 
     // spectrum, top band 10..30

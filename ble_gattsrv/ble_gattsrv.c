@@ -65,20 +65,20 @@ static void draw_cb(Canvas* c, void* ctx) {
     canvas_set_font(c, FontPrimary);
     canvas_draw_str(c, 2, 9, "GATT Server");
     canvas_set_font(c, FontSecondary);
+    canvas_draw_line(c, 0, 11, 127, 11);
     const char* st = app->status == BtStatusConnected      ? "connected" :
                      app->status == BtStatusAdvertising     ? "advertising" :
                      app->status == BtStatusOff             ? "off" :
                                                               "unavailable";
-    canvas_draw_str_aligned(c, 126, 9, AlignRight, AlignBottom, st);
-    canvas_draw_line(c, 0, 11, 127, 11);
-    canvas_draw_str(c, 2, 22, "Serial GATT service (RX/TX)");
-    snprintf(buf, sizeof(buf), "RX %lu B   TX %lu B", (unsigned long)app->rx_bytes, (unsigned long)app->tx_bytes);
-    canvas_draw_str(c, 2, 34, buf);
-    snprintf(buf, sizeof(buf), "Echo: %s (OK toggles)", app->echo ? "on" : "off");
-    canvas_draw_str(c, 2, 45, buf);
+    snprintf(buf, sizeof(buf), "Serial: %s", st);
+    canvas_draw_str(c, 2, 22, buf);
+    snprintf(buf, sizeof(buf), "RX %lu B  TX %lu B", (unsigned long)app->rx_bytes, (unsigned long)app->tx_bytes);
+    canvas_draw_str(c, 2, 33, buf);
+    snprintf(buf, sizeof(buf), "Echo %s  OK=toggle", app->echo ? "on" : "off");
+    canvas_draw_str(c, 2, 44, buf);
     if(app->last[0]) {
-        snprintf(buf, sizeof(buf), "last: %s", app->last);
-        canvas_draw_str(c, 2, 57, buf);
+        snprintf(buf, sizeof(buf), "last: %.14s", app->last);
+        canvas_draw_str(c, 2, 58, buf);
     }
     furi_mutex_release(app->mutex);
 }
