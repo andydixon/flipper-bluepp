@@ -16,7 +16,7 @@
 #                         includes the .fap under apps/Bluetooth) + SDK zip for ufbt
 #   ./build.sh flash      build and flash over USB (Flipper connected, qFlipper closed)
 #   ./build.sh fap        rebuild only the .fap (firmware already built once)
-#   BLE_API=all|min|hci,gap,gatt,hal,l2cap   which ST API to export (default hci,gatt)
+#   BLE_API=all|min|hci,gap,gatt,hal,l2cap   which ST API to export (default all)
 #   FW_TAG=1.4.3 ./build.sh   pin a different firmware tag (default 1.4.3)
 #   JOBS=2 ./build.sh         limit parallel compile jobs (default 4)
 set -euo pipefail
@@ -135,10 +135,10 @@ FBT_ARGS=(
 API_CSV=targets/f7/api_symbols.csv
 # BLE_API selects which ST command headers are exported to apps (each exported
 # function is kept in the firmware image):
-#   hci,gatt  scanning, connections, GATT client/server  (~12 KB, default)
-#   all       also gap, hal, l2cap                       (~20 KB)
-#   min       only the functions BT Inspector imports    (~1.5 KB)
-BLE_API="${BLE_API:-hci,gatt}"
+#   all       every gap/gatt/hci/hal/l2cap command       (~20 KB, default)
+#   hci,gatt  scanning, connections, GATT client/server  (~12 KB)
+#   min       only the functions the bundled apps import (~1.5 KB)
+BLE_API="${BLE_API:-all}"
 
 # --- Firmware API exported to .fap apps (in addition to the ST BLE commands) ---
 # Each area is appended below; every enabled symbol stays in the firmware image.
