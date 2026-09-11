@@ -1,0 +1,197 @@
+# BT Inspector for Flipper Zero
+
+A BLE scanner and GATT explorer for the Flipper Zero, in the spirit of
+BTInspector for iOS: discover nearby Bluetooth Low Energy devices, see their
+signal strength and everything they broadcast, then connect and inspect their
+services and characteristics: read, write, subscribe, and log it all.
+
+> **Read this first.** This app cannot run on stock Flipper firmware. The
+> Flipper's radio coprocessor ships with ST's "BLE Light" stack, which can only
+> advertise (peripheral role). It cannot scan for or connect to other devices.
+> BT Inspector is therefore delivered as a **custom firmware build** that swaps
+> in ST's full BLE stack and compiles the app in. `build.sh` does all of this.
+> See [Why a custom firmware build](#why-a-custom-firmware-build).
+
+## Features
+
+* **Live scan list.** Every BLE advertiser in range, sorted by RSSI, refreshed
+  every 300 ms as you move around. Shows name (or "(no name)"), RSSI in dBm
+  with signal bars, address and vendor. Devices unseen for 60 s drop off.
+* **Device page.** Address and address type, current/best RSSI and packet
+  count, advertising type (connectable or not), flags, advertised service UUIDs
+  (16/32/128-bit, named when known), service data, Tx power, appearance,
+  manufacturer data and raw advertisement / scan-response bytes. Updates live.
+* **Identification.** Manufacturer IDs map to vendor names. Decoders for:
+  * Apple Continuity: iBeacon (UUID/major/minor/Tx), Proximity Pairing with
+    AirPods/Beats **model name** and **left / right / case battery** and
+    charging state, Nearby Info (device activity), Nearby Action, Find My,
+    AirDrop, Handoff, AirPlay, tethering.
+  * Microsoft Connected Devices beacon: device type (Windows desktop/laptop,
+    Xbox, Surface Hub, Android, iPhone, ...).
+  * Google Fast Pair model ID, Eddystone UID/URL/TLM (URL decoded), COVID
+    Exposure Notification.
+* **Connect and interrogate.** OK on a connectable device connects (MTU is
+  negotiated), discovers all primary services, then characteristics with their
+  properties (`R`ead, `W`rite, `w`rite-without-response, `N`otify, `I`ndicate,
+  `B`roadcast).
+* **Read device info** (first item in the service list): reads every readable
+  characteristic of the Generic Access, Device Information and Battery services
+  in one go: device name, appearance, model number, serial number, firmware /
+  hardware / software revision, manufacturer name, PnP ID, battery level.
+* **Characteristic page.** Read any characteristic, including custom 128-bit
+  ones. Values are shown as hex plus decoded forms: printable string, u8/i8,
+  u16, u32, and SIG-specific formats (battery %, appearance, preferred
+  connection parameters, PnP ID, heart rate, temperature, humidity, pressure,
+  Tx power, date/time). Long values are fetched with read-long.
+* **Write** a value back as text, hex bytes or a number (little-endian, sized to
+  the current value or the magnitude). Uses write-with-response when the
+  characteristic supports it, otherwise write-without-response. A readable
+  characteristic is re-read after a write.
+* **Subscribe** to notifications / indications (the CCCD is located
+  automatically). Incoming values update the page and the history.
+* **Value history.** Each value seen for the open characteristic (reads and
+  notifications) is kept with a timestamp, newest first.
+* **Session log.** Every event is written with a date/time stamp to
+  `SD:/apps_data/bt_inspector/bti_YYYYMMDD_HHMMSS.log`: devices found (and
+  renamed), connects, services, characteristics, reads, writes, notifications,
+  errors. Copy it off the SD card (or via qFlipper) for analysis.
+
+## Building and installing
+
+Requirements: Linux or macOS with `git`, `python3` and a few GB of disk. The
+firmware build system downloads its own ARM toolchain.
+
+```sh
+./build.sh          # clone firmware 1.4.3, add the app, build with the full BLE stack
+./build.sh flash    # same, then flash over USB (Flipper connected, qFlipper closed)
+```
+
+Options via environment variables: `FW_TAG` (firmware tag, default `1.4.3`),
+`FW_DIR` (where to clone), `JOBS` (parallel compile jobs, default 4).
+
+The result is a standard update package in
+`flipperzero-firmware/dist/f7-C/f7-update-local/`. To install without USB
+flashing, copy that folder to the SD card (for example `SD:/update/`) and open
+it in the Flipper's file browser: the updater installs the firmware **and the
+full radio stack**. Installing an official firmware later restores the light
+stack the same way.
+
+The first build takes 5-15 minutes; later builds are incremental.
+
+## Using the app
+
+BT Inspector appears in the Flipper's main menu. While it runs, the Flipper's
+own BLE advertising is stopped (and any phone connection dropped); it is
+restored on exit.
+
+| Screen | Up / Down | OK | Left | Right | Back |
+|---|---|---|---|---|---|
+| Scan list | select device | device page | | | exit app |
+| Device page | scroll | Connect (if connectable) | | | scan list |
+| Services | select | open service / read device info | | | disconnect, device page |
+| Characteristics | select | open characteristic (auto-read) | | | services |
+| Characteristic | scroll | Read | Notify / Unsub | Write | characteristics |
+| Write menu | select | Text / Hex bytes / Number | | | characteristic |
+
+Status messages ("Read OK (5 B)", "Write failed: Write not permitted",
+"Notifications on", ...) appear on the characteristic page.
+
+On stock firmware the app opens with an explanation instead of scanning.
+
+## Log format
+
+One event per line:
+
+```
+[2026-09-11 09:12:03] START stack=full advertising_was=1
+[2026-09-11 09:12:04] DEVICE 5C:F3:70:9A:11:20 ADV_IND rssi=-58 name="Living Room" vendor=Apple adv=02 01 1A 0B FF 4C 00 ...
+[2026-09-11 09:12:20] CONNECTING Living Room
+[2026-09-11 09:12:21] CONNECTED Living Room mtu=247
+[2026-09-11 09:12:21] SERVICE 180A Device Information handles 0x0010-0x001C
+[2026-09-11 09:12:25] CHAR 2A26 handle 0x0016 props 0x02
+[2026-09-11 09:12:26] READ 0x0016 = 31 2E 32 2E 30
+[2026-09-11 09:12:40] WRITE 0x0021 = 01
+[2026-09-11 09:12:41] NOTIFY 0x0024 = 64
+[2026-09-11 09:13:00] DISCONNECT
+```
+
+A `DEVICE` line is written when a device is first seen and again when its name
+changes. `INFO` lines come from "Read device info".
+
+## Why a custom firmware build
+
+Three facts about the Flipper Zero drive the design:
+
+1. The STM32WB55's second core runs a prebuilt ST BLE stack. Flipper ships
+   `stm32wb5x_BLE_Stack_light_fw.bin` (peripheral + broadcaster only). ST's
+   `stm32wb5x_BLE_Stack_full_fw.bin` adds observer and central roles. The
+   firmware build system already supports it (`COPRO_STACK_TYPE=ble_full`) and
+   the firmware recognises it at runtime (`FuriHalBtStackFull`).
+2. External `.fap` apps can only call functions listed in the firmware's API
+   table. The ST `aci_*` / `hci_*` command functions are not in it, so a `.fap`
+   cannot start a scan or a connection. Compiling the app into the firmware
+   (`FlipperAppType.APP`, added with `--extra-int-apps`) gives it access.
+3. The full stack is 34 KB larger and loads at 0x080CE000 instead of
+   0x080D7000. The built image still leaves 12 flash pages (52 KB) for the
+   Flipper's internal storage (stock leaves 27).
+
+`build.sh` also widens the GAP roles the firmware initialises
+(`GAP_PERIPHERAL_ROLE | GAP_CENTRAL_ROLE | GAP_OBSERVER_ROLE`) in
+`targets/f7/ble_glue/gap.c`. The app itself uses HCI-level scan and connect
+commands, so this is belt-and-braces.
+
+## How it works
+
+```
+bt_inspector.c   UI (ViewDispatcher: scan list, text page, menus, inputs),
+                 worker thread for blocking BLE operations, session log
+ble_central.c    scan / connect / GATT client on top of the ST stack.
+                 Registers a handler with the firmware's BLE event dispatcher,
+                 acknowledges its own events (advertising reports, our
+                 connection's events) so the firmware's peripheral GAP never
+                 sees them, and turns async ATT events into synchronous calls
+ble_names.c      vendor / UUID / appearance tables and value decoders
+```
+
+The app registers for BLE events, stops the Flipper's own advertising, then
+issues `hci_le_set_scan_*`, `hci_le_create_connection` and `aci_gatt_*`
+commands directly. Connection-complete events are distinguished from the
+firmware's peripheral connections by the role field. Advertising reports are
+parsed from the raw HCI payload (the ST header's `Advertising_Report_t` is not a
+wire overlay).
+
+## Limitations
+
+* **BLE only.** The STM32WB55 has no Bluetooth Classic (BR/EDR), so classic
+  devices cannot be seen from any Flipper.
+* Apple battery levels come from what AirPods/Beats broadcast. Battery of
+  iPhones/Macs is only exposed to paired Apple devices.
+* Vendor, UUID and Apple model tables are curated subsets; unknown IDs are
+  shown as hex. Apple Continuity layouts are community-documented and may drift.
+* Value history is kept for the open characteristic; the log file has all of it.
+* iOS-only BTInspector features (Shortcuts, Live Activities, background scanning
+  mapped by location) have no Flipper equivalent.
+* Pairing/bonding with the target is not implemented; characteristics that
+  require encryption report "Insufficient auth" / "Insufficient encryption".
+* Tested by compiling into firmware 1.4.3; on-device behaviour needs a Flipper
+  with the full stack installed.
+
+## Troubleshooting
+
+* **"Radio stack has no scanning"** on launch: the light stack is installed.
+  Install the package produced by `build.sh`, which includes `radio.bin` with
+  the full stack.
+* **Build killed / out of memory**: `JOBS=2 ./build.sh`.
+* **Updater link errors about `bt`/`rpc`**: the app manifest must not `require`
+  the `bt` service (the same app list is linked into the tiny updater image).
+* **Connect failed: Timeout**: the device may not be connectable (see the
+  advertising type on the device page), or it is out of range. Random-address
+  devices that rotate their address may need re-selecting from the list.
+
+## Layout
+
+```
+bt_inspector/      app sources + application.fam
+build.sh           firmware build / flash script
+flipperzero-firmware/   created by build.sh (git-ignored)
+```
