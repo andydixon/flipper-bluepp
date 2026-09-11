@@ -1,9 +1,13 @@
-# BT Inspector for Flipper Zero
+# Flipper Zero BLE tools
 
-A BLE scanner and GATT explorer for the Flipper Zero, in the spirit of
-BTInspector for iOS: discover nearby Bluetooth Low Energy devices, see their
-signal strength and everything they broadcast, then connect and inspect their
-services and characteristics: read, write, subscribe, and log it all.
+Two BLE apps for the Flipper Zero, sharing one central/GATT layer (`libble/`):
+
+* **BT Inspector** — a BLE scanner and GATT explorer, in the spirit of
+  BTInspector for iOS: discover nearby Bluetooth Low Energy devices, see their
+  signal strength and everything they broadcast, then connect and inspect their
+  services and characteristics: read, write, subscribe, and log it all.
+* **BLE HID Host** — connect to a Bluetooth keyboard or mouse and watch its
+  input reports decoded live (keys, modifiers, mouse buttons and movement).
 
 > **Read this first.** This app cannot run on stock Flipper firmware. The
 > Flipper's radio coprocessor ships with ST's "BLE Light" stack, which can only
@@ -254,10 +258,29 @@ wire overlay).
   advertising type on the device page), or it is out of range. Random-address
   devices that rotate their address may need re-selecting from the list.
 
+## The BLE HID Host app
+
+Select a device from the scan list; the app connects, finds the HID service
+(0x1812), sets the protocol mode (boot when the device offers boot reports,
+otherwise report mode), and subscribes to its input-report characteristics.
+Keyboard reports are decoded to modifier + key names, mouse reports to button
+state and dx/dy/wheel. Events scroll on screen (Up/Down to review history) and
+are logged to `SD:/apps_data/ble_hid_host/hid_*.log` with the raw bytes. Back
+disconnects and returns to scanning.
+
+It cannot pair, so keyboards that require an encrypted link before sending
+reports will connect but stay silent; open ones and most mice work.
+
 ## Layout
 
 ```
-bt_inspector/      app sources, application.fam, icon.png
-build.sh           firmware build / flash script
+libble/            shared BLE central / GATT client + name & value decoders
+bt_inspector/      BT Inspector app (application.fam, icon.png, bt_inspector.c)
+ble_hid_host/      BLE HID Host app (HID-over-GATT setup + report decoding)
+build.sh           firmware build / flash script (stages libble into each app)
 flipperzero-firmware/   created by build.sh (git-ignored)
 ```
+
+`build.sh` copies `libble/*.{c,h}` into each app directory at build time, so
+both apps compile against one source of truth. Add an app by dropping its
+directory next to these and adding its name to `APPS=(...)` in `build.sh`.
