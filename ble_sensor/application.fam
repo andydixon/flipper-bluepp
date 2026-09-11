@@ -1,0 +1,15 @@
+# Needs firmware from ../build.sh (full BLE stack). Staged with libble/.
+App(
+    appid="ble_sensor",
+    name="BLE Sensor Dashboard",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="ble_sensor_app",
+    requires=["gui", "storage"],
+    stack_size=4 * 1024,
+    fap_category="Bluetooth",
+    fap_icon="icon.png",
+    fap_version="1.0",
+    fap_description="Connect a BLE sensor and watch its readings decoded live",
+    fap_author="andydixon",
+    fap_weburl="https://github.com/andydixon/flipper-bt-inspector",
+)
