@@ -10,5 +10,5 @@ App(
     fap_version="1.0",
     fap_description="Live RSSI spectrum and waterfall over a tunable window",
     fap_author="andydixon",
-    fap_weburl="https://github.com/andydixon/flipper-bt-inspector",
+    fap_weburl="https://github.com/andydixon/flipper-bluepp",
 )

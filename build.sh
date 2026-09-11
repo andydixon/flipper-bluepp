@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build a Flipper Zero firmware update package that contains BT Inspector.
+# Flipper Blue++ - build a Flipper Zero firmware update package with ST's full
+# BLE stack, the BLE command API exported to apps, and the Blue++ app suite.
 #
 # Why a firmware build and not a plain .fap:
 #   * The stock radio coprocessor image is ST's "BLE Light" stack: peripheral/
