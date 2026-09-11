@@ -178,6 +178,10 @@ symbol costs one API-table entry.
   without going through the firmware's serial profile. The coprocessor
   firmware-update calls (`ble_glue_fus_stack_delete/install`) are deliberately
   left disabled, since they can erase the radio stack.
+* **Power / battery internals**: the gas-gauge readings (voltage, current,
+  temperature, remaining/full/design capacity, health, charge state) are
+  already exported by stock firmware. This build also enables
+  `furi_hal_power_insomnia_level`; `furi_hal_power_init` stays disabled.
 
 `build.sh` also widens the GAP roles the firmware initialises
 (`GAP_PERIPHERAL_ROLE | GAP_CENTRAL_ROLE | GAP_OBSERVER_ROLE`) in
