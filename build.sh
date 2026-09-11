@@ -21,7 +21,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APPS=(bt_inspector ble_hid_host ble_sensor ble_tracker ble_gattfuzz ble_beacon ble_gattsrv subghz_scan) # app dirs under $HERE; BLE apps staged with libble/
+APPS=(bt_inspector ble_hid_host ble_sensor ble_tracker ble_gattfuzz ble_beacon ble_gattsrv subghz_scan subghz_spectrum) # app dirs under $HERE; BLE apps staged with libble/
 APP_SRC="$HERE/bt_inspector" # used only for the BLE_API=min symbol scan
 FW_DIR="${FW_DIR:-$HERE/flipperzero-firmware}"
 FW_TAG="${FW_TAG:-1.4.3}"
