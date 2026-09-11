@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 // BLE Beacon Toolkit: broadcast an iBeacon or a raw advertising payload with a
 // chosen (random) MAC, using the firmware's extra-beacon API. Needs the full
 // BLE stack. iBeacon mode wraps 21 entered bytes (16 UUID + 2 major + 2 minor +

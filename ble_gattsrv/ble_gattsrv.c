@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 // BLE GATT Server / emulator: bring up the Flipper as a connectable BLE serial
 // peripheral (a custom 128-bit GATT service with RX/TX characteristics) via the
 // bt service's profile API, and echo whatever a central writes back to it as a

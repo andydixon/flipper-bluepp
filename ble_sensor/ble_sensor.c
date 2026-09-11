@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 // BLE Sensor Dashboard: connect to a selected BLE peripheral, find its readable
 // and notifying characteristics with known SIG meanings (battery, heart rate,
 // temperature, humidity, pressure, Tx power, ...), and show them decoded and

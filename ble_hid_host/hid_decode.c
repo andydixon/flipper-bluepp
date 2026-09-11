@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Andy Dixon <andy@dixon.cx>
 #include "hid_decode.h"
 
 // USB HID Usage Table (keyboard/keypad page 0x07), common subset.
