@@ -1,21 +1,48 @@
 # Flipper Zero BLE tools
 
-Two BLE apps for the Flipper Zero, sharing one central/GATT layer (`libble/`):
+A suite of BLE, sub-GHz and power tools for the Flipper Zero. The BLE apps
+share one central/GATT layer (`libble/`).
 
-* **BT Inspector** — a BLE scanner and GATT explorer, in the spirit of
-  BTInspector for iOS: discover nearby Bluetooth Low Energy devices, see their
-  signal strength and everything they broadcast, then connect and inspect their
-  services and characteristics: read, write, subscribe, and log it all.
-* **BLE HID Host** — connect to a Bluetooth keyboard or mouse and watch its
-  input reports decoded live (keys, modifiers, mouse buttons and movement).
+**Bluetooth (need the `build.sh` firmware)**
 
-> **Read this first.** This app cannot run on stock Flipper firmware. The
-> Flipper's radio coprocessor ships with ST's "BLE Light" stack, which can only
-> advertise (peripheral role). It cannot scan for or connect to other devices.
-> BT Inspector is therefore delivered as a **custom firmware build** that swaps
-> in ST's full BLE stack and exports the BLE command API to apps. The app itself
-> is a normal `.fap`. `build.sh` does all of this.
-> See [Why a custom firmware build](#why-a-custom-firmware-build).
+* **BT Inspector** — BLE scanner and GATT explorer, in the spirit of
+  BTInspector for iOS: discover devices, decode everything they broadcast, then
+  connect and inspect/read/write/subscribe, and log it all.
+* **BLE HID Host** — connect a Bluetooth keyboard or mouse and watch its input
+  reports decoded live.
+* **BLE Sensor Dashboard** — connect a sensor and watch its known-service
+  readings (battery, heart rate, temperature, humidity, pressure, ...) decoded
+  and updating live.
+* **BLE Tracker Detector** — passively flag nearby item trackers (Apple Find
+  My / AirTag, Tile, Samsung SmartTag) with a "following you" warning.
+* **BLE GATT Fuzzer** — enumerate a peripheral's whole GATT database, read every
+  readable value, and fuzz writable characteristics with boundary payloads,
+  logging every response. For authorised testing of devices you own.
+* **BLE Beacon Toolkit** — broadcast an iBeacon or a raw advertising payload
+  with a chosen random MAC.
+* **BLE GATT Server** — advertise the Flipper as a connectable serial GATT
+  peripheral and echo whatever a central writes.
+
+**Sub-GHz (need the region unlock, on by default)**
+
+* **Sub-GHz Scanner** — sweep RSSI across the full CC1101 range and log active
+  frequencies.
+* **Sub-GHz Spectrum** — live spectrum bar graph and waterfall over a tunable
+  centre/span window.
+
+**Tools**
+
+* **Battery Health** — live fuel-gauge readings (voltage, current, temperature,
+  capacity, health, wear) with a voltage graph. Read-only.
+
+> **Read this first.** These apps do not run on stock Flipper firmware. The
+> Flipper's radio coprocessor ships with ST's "BLE Light" stack (advertise-only:
+> it cannot scan or connect), and the sub-GHz region check blocks transmit
+> off-region. They are delivered as a **custom firmware build** that swaps in
+> ST's full BLE stack, exports the BLE command API to apps, and unlocks the
+> sub-GHz region; the apps themselves are ordinary `.fap` files. `build.sh` does
+> all of this. See [Why a custom firmware build](#why-a-custom-firmware-build).
+> Battery Health is the only one that would also run on stock firmware.
 
 ## Features
 

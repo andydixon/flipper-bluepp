@@ -21,7 +21,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APPS=(bt_inspector ble_hid_host) # app dirs under $HERE, each staged with libble/
+APPS=(bt_inspector ble_hid_host) # app dirs under $HERE; BLE apps staged with libble/
 APP_SRC="$HERE/bt_inspector" # used only for the BLE_API=min symbol scan
 FW_DIR="${FW_DIR:-$HERE/flipperzero-firmware}"
 FW_TAG="${FW_TAG:-1.4.3}"
@@ -119,7 +119,10 @@ mkdir -p applications_user
 for app in "${APPS[@]}"; do
     rm -rf "applications_user/$app"
     cp -r "$HERE/$app" "applications_user/$app"
-    cp "$HERE"/libble/*.c "$HERE"/libble/*.h "applications_user/$app/"
+    # Only apps that include the shared header get the libble sources.
+    if grep -rql 'ble_central.h' "$HERE/$app"; then
+        cp "$HERE"/libble/*.c "$HERE"/libble/*.h "applications_user/$app/"
+    fi
 done
 
 FBT_ARGS=(
