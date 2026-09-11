@@ -128,8 +128,37 @@ EXPORT_ENABLE+='
 ^furi_hal_flash_
 '
 fi
+# RPC + loader internals: the public rpc_* / loader_* APIs (session open/feed/
+# close, app data exchange, launch/enqueue/lock/menu) are already exported by
+# stock firmware; enable them explicitly so they stay on, and add the internal
+# loader header set so apps can reach the internal Loader handle and helpers.
+EXPORT_ENABLE+='
+^rpc_
+^loader_
+'
 export EXPORT_ENABLE
-if grep -q "^Function,?," "$API_CSV" || ! grep -qE "^Header,\+,.*ble_hci_le\.h" "$API_CSV"; then
+
+# Add the loader internal headers to the SDK (rpc_i.h is skipped: it pulls the
+# protobuf headers, which are not part of the app SDK).
+python3 - applications/services/loader/application.fam <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+want = '''        "loader.h",
+        "loader_i.h",
+        "loader_menu.h",
+        "loader_queue.h",
+        "loader_applications.h",
+        "firmware_api/firmware_api.h",'''
+have = '''        "loader.h",
+        "firmware_api/firmware_api.h",'''
+if "loader_i.h" not in s:
+    s = s.replace(have, want, 1)
+    open(p, "w").write(s)
+    print(">> patched " + p + ": loader internal headers added to SDK")
+PY
+if grep -q "^Function,?," "$API_CSV" || ! grep -qE "^Header,\+,.*ble_hci_le\.h" "$API_CSV" \
+   || ! grep -qE "^Header,\+,.*loader_i\.h" "$API_CSV"; then
     # fbt notices the new headers, rewrites the csv with '?' entries and stops.
     echo ">> syncing API symbol table (expected to stop once)"
     ./fbt -j"${JOBS:-4}" "${FBT_ARGS[@]}" api_check || true
