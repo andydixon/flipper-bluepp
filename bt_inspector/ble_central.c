@@ -1,12 +1,36 @@
 #include "ble_central.h"
 #include <furi_hal.h>
 #include <furi_ble/event_dispatcher.h>
-#include <ble/ble.h>
-#include <interface/patterns/ble_thread/tl/tl.h>
+#include <ble/core/ble_defs.h>
+#include <ble/core/ble_std.h>
+#include <ble/core/auto/ble_types.h>
+#include <ble/core/auto/ble_vs_codes.h>
+#include <ble/core/auto/ble_hci_le.h>
+#include <ble/core/auto/ble_gatt_aci.h>
 #include <string.h>
 #include <stdlib.h>
 
 #define TAG "BtInspector"
+
+// Wire layout of the packets handed to dispatcher handlers (from ST's tl.h,
+// redeclared here so the app only needs the exported SDK headers).
+typedef struct __attribute__((packed)) {
+    uint8_t type;
+    uint8_t data[1];
+} BcHciPkt;
+typedef struct __attribute__((packed)) {
+    uint8_t evt;
+    uint8_t plen;
+    uint8_t data[1];
+} BcHciEvent;
+typedef struct __attribute__((packed)) {
+    uint8_t subevent;
+    uint8_t data[1];
+} BcLeMetaEvent;
+typedef struct __attribute__((packed)) {
+    uint16_t ecode;
+    uint8_t data[1];
+} BcAciEvent;
 
 #define OWN_ADDR_TYPE GAP_PUBLIC_ADDR // firmware programs a public identity address
 #define PROC_TIMEOUT_MS 5000
@@ -134,11 +158,11 @@ static void handle_adv_report(BleCentral* bc, const uint8_t* p, size_t len) {
 
 static BleEventAckStatus bc_event_handler(void* event, void* context) {
     BleCentral* bc = context;
-    hci_event_pckt* pkt = (hci_event_pckt*)((hci_uart_pckt*)event)->data;
+    BcHciEvent* pkt = (BcHciEvent*)((BcHciPkt*)event)->data;
 
     switch(pkt->evt) {
     case HCI_LE_META_EVT_CODE: {
-        evt_le_meta_event* meta = (evt_le_meta_event*)pkt->data;
+        BcLeMetaEvent* meta = (BcLeMetaEvent*)pkt->data;
         if(meta->subevent == HCI_LE_ADVERTISING_REPORT_SUBEVT_CODE) {
             handle_adv_report(bc, meta->data, pkt->plen - 1);
             return BleEventAckFlowEnable;
@@ -173,7 +197,7 @@ static BleEventAckStatus bc_event_handler(void* event, void* context) {
         return BleEventNotAck;
     }
     case HCI_VENDOR_SPECIFIC_DEBUG_EVT_CODE: {
-        evt_blecore_aci* aci = (evt_blecore_aci*)pkt->data;
+        BcAciEvent* aci = (BcAciEvent*)pkt->data;
         uint16_t ch = aci->data[0] | (aci->data[1] << 8); // every event below starts with it
         if(!bc->connected || ch != bc->conn_handle) return BleEventNotAck;
 
@@ -306,9 +330,6 @@ void bc_scan_stop(BleCentral* bc) {
     bc->scanning = false;
 }
 
-static int cmp_rssi(const void* a, const void* b) {
-    return ((const BcDevice*)b)->rssi - ((const BcDevice*)a)->rssi;
-}
 
 size_t bc_snapshot(BleCentral* bc, BcDevice* out, size_t max) {
     size_t n = 0;
@@ -325,7 +346,15 @@ size_t bc_snapshot(BleCentral* bc, BcDevice* out, size_t max) {
         d->logged = true;
     }
     furi_mutex_release(bc->mutex);
-    qsort(out, n, sizeof(BcDevice), cmp_rssi);
+    for(size_t i = 1; i < n; i++) { // insertion sort by RSSI, strongest first (n <= 32)
+        BcDevice d = out[i];
+        size_t j = i;
+        while(j > 0 && out[j - 1].rssi < d.rssi) {
+            out[j] = out[j - 1];
+            j--;
+        }
+        out[j] = d;
+    }
     return n;
 }
 

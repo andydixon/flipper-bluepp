@@ -10,7 +10,7 @@
 #include <gui/modules/text_input.h>
 #include <gui/modules/number_input.h>
 #include <storage/storage.h>
-#include <ble/ble.h>
+#include <ble/core/ble_defs.h>
 #include <string.h>
 #include <stdarg.h>
 #include "ble_central.h"
