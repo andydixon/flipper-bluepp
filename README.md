@@ -165,6 +165,20 @@ Three facts about the Flipper Zero drive the design:
    `stm32wb5x_BLE_Stack_full_extended_fw.bin` (BLE 5 extended advertising,
    Coded PHY), which loads at 0x080C5000; it is not selected by this script.
 
+### Extra firmware APIs exported to apps
+
+Beyond the ST BLE commands, `build.sh` enables a set of firmware functions that
+stock firmware keeps internal, so any `.fap` on this firmware can use them. The
+set is a list of name patterns in `build.sh` (`EXPORT_ENABLE`); each enabled
+symbol costs one API-table entry.
+
+* **BLE peripheral internals** (`gap_*`, safe `ble_glue_*`, `furi_hal_bt_init`):
+  drive GAP directly, run a custom GATT server, change the advertised name and
+  the extra-beacon config, read connection state and radio-stack status,
+  without going through the firmware's serial profile. The coprocessor
+  firmware-update calls (`ble_glue_fus_stack_delete/install`) are deliberately
+  left disabled, since they can erase the radio stack.
+
 `build.sh` also widens the GAP roles the firmware initialises
 (`GAP_PERIPHERAL_ROLE | GAP_CENTRAL_ROLE | GAP_OBSERVER_ROLE`) in
 `targets/f7/ble_glue/gap.c`. The app itself uses HCI-level scan and connect
