@@ -246,8 +246,23 @@ only; you are responsible for operating within the law.** Build with
 
 ## Limitations
 
+**Shared / hardware**
+
 * **BLE only.** The STM32WB55 has no Bluetooth Classic (BR/EDR), so classic
-  devices cannot be seen from any Flipper.
+  devices cannot be seen or connected from any Flipper.
+* **No pairing or bonding as central.** Neither app pairs, so anything gated
+  behind an encrypted link is out of reach: encrypted characteristics report
+  "Insufficient auth" / "Insufficient encryption", and keyboards that only send
+  reports after bonding stay silent.
+* At most two concurrent links (the firmware's BLE config), and while either app
+  runs the Flipper's own advertising is stopped and any phone link dropped, then
+  restored on exit.
+* Built and checked against firmware 1.4.3 as `.fap` apps; on-device behaviour
+  needs a Flipper running the firmware from `build.sh` (full stack + exported
+  API). The apps will not load on stock firmware (missing exported symbols).
+
+**BT Inspector**
+
 * Apple battery levels come from what AirPods/Beats broadcast. Battery of
   iPhones/Macs is only exposed to paired Apple devices.
 * Vendor, UUID and Apple model tables are curated subsets; unknown IDs are
@@ -255,10 +270,35 @@ only; you are responsible for operating within the law.** Build with
 * Value history is kept for the open characteristic; the log file has all of it.
 * iOS-only BTInspector features (Shortcuts, Live Activities, background scanning
   mapped by location) have no Flipper equivalent.
-* Pairing/bonding with the target is not implemented; characteristics that
-  require encryption report "Insufficient auth" / "Insufficient encryption".
-* Tested by compiling into firmware 1.4.3; on-device behaviour needs a Flipper
-  with the full stack installed.
+
+**BLE HID Host**
+
+* Report-mode devices are decoded heuristically (8+ byte reports as keyboard,
+  shorter as mouse) rather than by parsing the Report Map; unusual layouts
+  (consumer-control keys, multi-touch, gamepads) may decode oddly or not at all.
+* Keyboard decoding covers the common USB HID usage page; media/consumer keys
+  and vendor usages show as raw `[XX]`. No key-repeat or text reconstruction,
+  just the reports as they arrive.
+* Only input reports are shown; output reports (LEDs) and feature reports are
+  not driven.
+
+**Exported firmware APIs (unlocks)**
+
+* Every exported function stays in the firmware image, so larger `BLE_API`
+  settings and the extra exports cost flash and shrink internal storage (see the
+  table above). `EXPORT_FLASH=0` and `SUBGHZ_UNLOCK=0` opt out.
+* Flash / option-byte access is raw and unguarded: a misbehaving app can wipe
+  storage or brick the device. Nothing in these apps uses it; it is exposed for
+  other apps built against this SDK.
+* RPC/loader internals expose only the internal *types*; the internal helper
+  functions are not exported (they are not in the firmware API-table link). The
+  public RPC and loader APIs remain the supported surface.
+* **Sub-GHz unlock removes the region check only.** The CC1101 PLL bands
+  (~300-348 / 387-464 / 779-928 MHz) still bound what the radio can tune, and
+  transmitting outside your local allocation may be illegal. Research and
+  authorised testing only; you are responsible for legal operation.
+* The exported ST BLE command API and these unlocks are compile-verified, not
+  exercised on hardware.
 
 ## Troubleshooting
 
