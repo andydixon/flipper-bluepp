@@ -1,0 +1,15 @@
+# Needs firmware from ../build.sh (full BLE stack + exported peripheral API).
+App(
+    appid="ble_beacon",
+    name="BLE Beacon Toolkit",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="ble_beacon_app",
+    requires=["gui"],
+    stack_size=2 * 1024,
+    fap_category="Bluetooth",
+    fap_icon="icon.png",
+    fap_version="1.0",
+    fap_description="Broadcast iBeacon or raw BLE advertisements with a chosen MAC",
+    fap_author="andydixon",
+    fap_weburl="https://github.com/andydixon/flipper-bt-inspector",
+)
